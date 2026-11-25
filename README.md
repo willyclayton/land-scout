@@ -32,6 +32,20 @@ The two `EX-` rows are fake sample rows. Delete them.
 
 **Parcel outline (optional):** draw the parcel at geojson.io, then copy the feature into `web/boundaries.geojson` with `"listing_id"` set in `properties`.
 
+## All Rabun listings, from RentCast
+
+A GitHub Action (`.github/workflows/enrich.yml`) runs every Monday. It pulls every active for-sale home and land listing in Rabun County from the [RentCast](https://www.rentcast.io/api) API into `web/rentcast.json`, then redeploys the site. Each listing card then shows type, lot size, HOA, listed date, days on market, MLS number, listing agent and office (tap to call or email), price history, assessed value, property tax, last sale, parcel ID, and home features.
+
+One-time setup:
+
+1. Sign up at rentcast.io and create an API key.
+2. In GitHub, go to the repo's **Settings → Secrets and variables → Actions**. Add a secret named `RENTCAST_API_KEY` with the key.
+3. Go to **Actions → Pull Rabun listings (RentCast) → Run workflow** to run it now instead of waiting for Monday.
+
+**API calls:** one search covers the whole county. After that, each listing costs one call for its tax and sale record, the first time only, because records are cached in `data/rentcast_cache.json`. Each run stops at `MAX_CALLS` (default 10) so it stays inside the free tier. Records for remaining listings fill in on later runs. On a paid plan, set a repo **variable** `MAX_CALLS` (for example 500) under Settings → Secrets and variables → Actions → Variables, and everything fills in on the first run.
+
+Your own rows in `listings.csv` are matched to a RentCast listing at the same spot. If there isn't one, the script looks up the `address` instead. What you typed by hand always wins. Listings you added yourself have a blue ring on the map.
+
 ## What's on the map
 
 - Satellite or USGS topo base map, with hillshade

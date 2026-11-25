@@ -37,6 +37,10 @@
   .links a { display:inline-block; margin:0 8px 8px 0; padding:6px 10px; border:1px solid var(--line);
     border-radius:8px; color:var(--accent); text-decoration:none; }
   .notes { white-space:pre-wrap; border-top:1px solid var(--line); padding-top:8px; }
+  .hist { width:100%; border-collapse:collapse; margin-bottom:12px; font-size:14px; }
+  .hist td { padding:3px 6px 3px 0; border-bottom:1px solid var(--line); }
+  .hist td:last-child { text-align:right; font-weight:600; }
+  dd a { color:var(--accent); }
   h4.sec { margin:14px 0 6px; font-size:12px; text-transform:uppercase; color:var(--muted); border-top:1px solid var(--line); padding-top:10px; }
   .hint { color:var(--muted); font-size:12px; margin-top:4px; }
   .legend span { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; }
@@ -67,7 +71,10 @@
   <label>Min acres <input type="number" id="f-acres" step="0.5" placeholder="any"></label>
   <label>Min beds <input type="number" id="f-beds" step="1" placeholder="any"></label>
   <label><input type="checkbox" id="f-house"> Has a house</label>
-  <div class="legend"><span style="background:#e4572e"></span>house <span style="background:#ffc914;margin-left:8px"></span>land only</div>
+  <label>Max days on market <input type="number" id="f-dom" step="10" placeholder="any"></label>
+  <label><input type="checkbox" id="f-mine"> Only my listings</label>
+  <div class="legend"><span style="background:#e4572e"></span>house <span style="background:#ffc914;margin-left:8px"></span>land only <span style="border:2px solid #3ab0ff;margin-left:8px"></span>mine</div>
+  <div class="hint" id="updated"></div>
 </details>
 
 <div id="sheet"><button id="close" aria-label="Close">×</button><div id="card"></div></div>
@@ -169,7 +176,8 @@ const map = new maplibregl.Map({
       { id: 'bounds-fill', type: 'fill', source: 'bounds', paint: { 'fill-color': '#ffc914', 'fill-opacity': 0.15 } },
       { id: 'bounds-line', type: 'line', source: 'bounds', paint: { 'line-color': '#ffc914', 'line-width': 2.5 } },
       { id: 'pts', type: 'circle', source: 'listings', paint: {
-        'circle-radius': 8, 'circle-stroke-width': 2, 'circle-stroke-color': '#fff',
+        'circle-radius': ['case', ['get', 'mine'], 10, 7], 'circle-stroke-width': ['case', ['get', 'mine'], 3, 1.5],
+        'circle-stroke-color': ['case', ['get', 'mine'], '#3ab0ff', '#fff'],
         'circle-color': ['case', ['get', 'house'], '#e4572e', '#ffc914'] } },
       { id: 'pts-label', type: 'symbol', source: 'listings', minzoom: 12,
         layout: { 'text-field': ['get', 'label'], 'text-font': FONT_BOLD, 'text-size': 12, 'text-offset': [0, 1.4] },
@@ -225,22 +233,53 @@ async function load() {
       l.house = l.beds != null || l.sqft != null;
       return l;
     });
+  listings.forEach(l => l.mine = true);
   try { boundaries = await (await fetch('boundaries.geojson', { cache: 'no-store' })).json(); } catch (e) {}
+
+  // RentCast pull (written weekly by the GitHub Action). Optional.
+  let rc = null;
+  try { rc = await (await fetch('rentcast.json', { cache: 'no-store' })).json(); } catch (e) {}
+  if (!rc) return;
+  updated = rc.updated;
+  const byId = new Map(rc.listings.map(r => [r.id, r]));
+  const claimed = new Set();
+  for (const l of listings) {
+    const m = rc.mine?.[l.listing_id];
+    if (m?.rentcast_id && byId.has(m.rentcast_id)) { attachRC(l, byId.get(m.rentcast_id)); claimed.add(m.rentcast_id); }
+    else if (m?.record) l.record = m.record;
+  }
+  for (const r of rc.listings) {
+    if (claimed.has(r.id)) continue;
+    const l = { listing_id: 'rc-' + r.id, source: 'RentCast', mine: false, notes: '', drive_min_atl: null };
+    attachRC(l, r); listings.push(l);
+  }
+}
+let updated = null;
+// Copy RentCast fields onto a listing, keeping anything you typed by hand.
+function attachRC(l, r) {
+  l.rc = r; l.record = r.record || l.record;
+  for (const [k, v] of Object.entries({ price: r.price, acres: r.acres, beds: r.beds, baths: r.baths, sqft: r.sqft,
+    year_built: r.year_built, lat: r.lat, lng: r.lng, address: r.address, status: r.status }))
+    if (l[k] == null || l[k] === '') l[k] = v;
+  l.house = l.beds != null || l.sqft != null || (r.property_type && !/land/i.test(r.property_type));
 }
 
 const pts = list => ({ type: 'FeatureCollection', features: list.map(l => ({
   type: 'Feature', id: listings.indexOf(l),
-  properties: { i: listings.indexOf(l), house: l.house, label: l.price ? '$' + Math.round(l.price / 1000) + 'k' : '' },
+  properties: { i: listings.indexOf(l), house: !!l.house, mine: !!l.mine, label: l.price ? '$' + Math.round(l.price / 1000) + 'k' : '' },
   geometry: { type: 'Point', coordinates: [l.lng, l.lat] },
 })) });
 
 function filtered() {
   const v = id => num(document.getElementById(id).value);
-  const maxP = v('f-price'), minA = v('f-acres'), minB = v('f-beds'), house = document.getElementById('f-house').checked;
+  const maxP = v('f-price'), minA = v('f-acres'), minB = v('f-beds'), maxD = v('f-dom'),
+    house = document.getElementById('f-house').checked, mineOnly = document.getElementById('f-mine').checked;
   return listings.filter(l =>
     (maxP == null || (l.price != null && l.price <= maxP)) &&
     (minA == null || (l.acres != null && l.acres >= minA)) &&
     (minB == null || (l.beds != null && l.beds >= minB)) &&
+    (maxD == null || (l.rc?.days_on_market != null && l.rc.days_on_market <= maxD)) &&
+    (!mineOnly || l.mine) &&
     (!house || l.house));
 }
 
@@ -251,8 +290,9 @@ function refresh() {
   const ids = new Set(list.map(l => l.listing_id));
   map.getSource('bounds').setData({ ...boundaries, features: boundaries.features.filter(f => ids.has(String(f.properties.listing_id))) });
   document.getElementById('count').textContent = list.length;
+  document.getElementById('updated').textContent = updated ? `Listings from RentCast, updated ${updated}.` : 'No RentCast data yet (see README).';
 }
-['f-price', 'f-acres', 'f-beds', 'f-house'].forEach(id => document.getElementById(id).oninput = refresh);
+['f-price', 'f-acres', 'f-beds', 'f-house', 'f-dom', 'f-mine'].forEach(id => document.getElementById(id).oninput = refresh);
 
 // ---- Card ------------------------------------------------------------------
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -331,6 +371,24 @@ function showSpot(lat, lng) {
   fillSite(lat, lng);
 }
 
+// Card helpers
+function section(title, rows) {
+  rows = rows.filter(([, v]) => v != null && v !== '');
+  return rows.length ? `<h4 class="sec">${esc(title)}</h4>${dl(rows)}` : '';
+}
+const telLink = p => `<a href="tel:${esc(p.replace(/[^0-9+]/g, ''))}">${esc(p)}</a>`;
+const mailLink = m => `<a href="mailto:${esc(m)}">${esc(m)}</a>`;
+function historyTable(h) {
+  if (!h?.length) return '';
+  return `<h4 class="sec">Price history</h4><table class="hist">${h.map(e =>
+    `<tr><td>${esc(e.date)}</td><td>${esc(e.event || '')}</td><td>${esc(money(e.price))}</td></tr>`).join('')}</table>`;
+}
+function searchLinks(addr) {
+  if (!addr || /EXAMPLE/.test(addr)) return [];
+  const q = encodeURIComponent(addr);
+  return [['Zillow', `https://www.zillow.com/homes/${q}_rb/`], ['Search the web', `https://www.google.com/search?q=${q}`]];
+}
+
 function showCard(l) {
   const rows = [
     ['Price', money(l.price)],
@@ -343,6 +401,10 @@ function showCard(l) {
     ['$ / sq ft', l.price && l.sqft ? money(l.price / l.sqft) : '—'],
     ['Year built', l.year_built ?? '—'],
   );
+  const r = l.rc || {}, rec = l.record || {};
+  if (r.property_type) rows.splice(0, 0, ['Type', r.property_type]);
+  if (r.lot_sqft) rows.push(['Lot', `${r.lot_sqft.toLocaleString()} sq ft (${r.acres} ac)`]);
+  if (r.hoa_fee) rows.push(['HOA', money(r.hoa_fee) + ' / mo']);
   rows.push(['Drive to ATL', l.drive_min_atl ? `${l.drive_min_atl} min` : '— (tap Directions)'], ['Status', l.status || '—']);
 
   const ll = `${l.lat},${l.lng}`;
@@ -351,8 +413,20 @@ function showCard(l) {
     <h2>${esc(l.address || l.listing_id)}</h2>
     <div class="sub">${esc(l.house ? 'House' : 'Land only')} · ${esc(l.source || '')} · ${esc(l.lat.toFixed(5))}, ${esc(l.lng.toFixed(5))}</div>
     ${dl(rows)}
-    ${linkRow([safeUrl(l.url) && ['Listing', l.url], ...placeLinks(ll)])}
+    ${linkRow([safeUrl(l.url) && ['Listing', l.url], ...searchLinks(l.address), ...placeLinks(ll)])}
     ${l.notes ? `<div class="notes">${esc(l.notes)}</div>` : ''}
+    ${section('On the market', [
+      ['Listed', r.listed_date], ['Days on market', r.days_on_market], ['Listing type', r.listing_type], ['MLS', r.mls]])}
+    ${section('Listing agent', [
+      ['Agent', r.agent?.name], ['Phone', r.agent?.phone && telLink(r.agent.phone), true], ['Email', r.agent?.email && mailLink(r.agent.email), true],
+      ['Office', r.office?.name], ['Office phone', r.office?.phone && telLink(r.office.phone), true]])}
+    ${historyTable(r.history)}
+    ${section('Tax & sale record', [
+      ['Parcel ID', rec.parcel_id], ['Assessed value', rec.assessed_value && `${money(rec.assessed_value)} (${rec.assessed_year})`],
+      ['Property tax', rec.annual_tax && `${money(rec.annual_tax)} / yr (${rec.tax_year})`],
+      ['Last sold', rec.last_sale_date && `${rec.last_sale_date}${rec.last_sale_price ? ' for ' + money(rec.last_sale_price) : ''}`],
+      ['Subdivision', rec.subdivision], ['Zoning', rec.zoning]])}
+    ${section('Features', Object.entries(rec.features || {}))}
     <h4 class="sec">The site</h4>
     ${dl(siteRows(l.lat, l.lng))}`;
   document.getElementById('sheet').classList.add('open');
