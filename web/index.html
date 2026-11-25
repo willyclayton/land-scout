@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Land Scout</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+  :root { --bg:#fff; --fg:#1a1a1a; --muted:#666; --line:#e3e3e3; --accent:#0a7d4f; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#1c1c1e; --fg:#f2f2f2; --muted:#a0a0a0; --line:#333; --accent:#3ccf8e; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--fg);
+    font:15px/1.4 -apple-system, system-ui, sans-serif; }
+  #map { position:fixed; inset:0; }
+  .panel { position:absolute; top:10px; left:10px; z-index:2; background:var(--bg);
+    border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,.25); padding:8px 10px; max-width:calc(100vw - 70px); }
+  .panel summary { cursor:pointer; font-weight:600; }
+  .panel label { display:block; margin:6px 0; white-space:nowrap; }
+  .panel input[type=number] { width:100px; }
+  .panel h4 { margin:10px 0 2px; font-size:12px; text-transform:uppercase; color:var(--muted); }
+  #sheet { position:absolute; left:0; right:0; bottom:0; z-index:3; background:var(--bg);
+    border-radius:14px 14px 0 0; box-shadow:0 -2px 12px rgba(0,0,0,.3);
+    padding:14px 16px calc(16px + env(safe-area-inset-bottom)); max-height:65vh; overflow:auto;
+    transform:translateY(110%); transition:transform .2s; }
+  #sheet.open { transform:none; }
+  @media (min-width: 700px) {
+    #sheet { left:auto; right:10px; bottom:auto; top:10px; width:360px; border-radius:12px; }
+  }
+  #sheet h2 { margin:0 28px 2px 0; font-size:20px; }
+  #sheet .sub { color:var(--muted); margin-bottom:10px; }
+  #close { position:absolute; top:8px; right:10px; border:0; background:none; font-size:24px; color:var(--fg); cursor:pointer; }
+  dl { display:grid; grid-template-columns:auto 1fr; gap:4px 12px; margin:0 0 12px; }
+  dt { color:var(--muted); } dd { margin:0; font-weight:600; }
+  .links a { display:inline-block; margin:0 8px 8px 0; padding:6px 10px; border:1px solid var(--line);
+    border-radius:8px; color:var(--accent); text-decoration:none; }
+  .notes { white-space:pre-wrap; border-top:1px solid var(--line); padding-top:8px; }
+  .legend span { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<details class="panel" open>
+  <summary>Land Scout · <span id="count">0</span> listings</summary>
+  <h4>Map</h4>
+  <label><input type="radio" name="base" value="sat" checked> Satellite</label>
+  <label><input type="radio" name="base" value="topo"> Topo</label>
+  <h4>Layers</h4>
+  <label><input type="checkbox" id="lyr-hill" checked> Hillshade</label>
+  <label><input type="checkbox" id="lyr-slope"> Slope</label>
+  <label><input type="checkbox" id="lyr-flood"> FEMA flood zones</label>
+  <h4>Filters</h4>
+  <label>Max price $ <input type="number" id="f-price" step="10000" placeholder="any"></label>
+  <label>Min acres <input type="number" id="f-acres" step="0.5" placeholder="any"></label>
+  <label>Min beds <input type="number" id="f-beds" step="1" placeholder="any"></label>
+  <label><input type="checkbox" id="f-house"> Has a house</label>
+  <div class="legend"><span style="background:#e4572e"></span>house <span style="background:#ffc914;margin-left:8px"></span>land only</div>
+</details>
+
+<div id="sheet"><button id="close" aria-label="Close">×</button><div id="card"></div></div>
+
+<script>
+// ---- Settings -------------------------------------------------------------
+const CENTER = [-83.40, 34.88];               // Clayton, GA
+const ATL = '33.7816,-84.3830';               // Midtown Atlanta
+const QPUBLIC = 'https://qpublic.schneidercorp.com/Application.aspx?App=RabunCountyGA&Layer=Parcels&PageType=Search';
+
+// Live public map services (loaded by your browser, no keys needed)
+const esriTile = s => `https://server.arcgisonline.com/ArcGIS/rest/services/${s}/MapServer/tile/{z}/{y}/{x}`;
+const usgsTile = s => `https://basemap.nationalmap.gov/arcgis/rest/services/${s}/MapServer/tile/{z}/{y}/{x}`;
+const BBOX = 'bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&f=image';
+const FLOOD = `https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?${BBOX}&format=png32&transparent=true&layers=show:28`;
+const SLOPE = `https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage?${BBOX}&format=png&renderingRule=` +
+  encodeURIComponent(JSON.stringify({ rasterFunction: 'Slope Map' }));
+
+const raster = (tiles, maxzoom = 19, attribution = '') => ({ type: 'raster', tiles: [tiles], tileSize: 256, maxzoom, attribution });
+
+const map = new maplibregl.Map({
+  container: 'map',
+  center: CENTER, zoom: 11,
+  style: {
+    version: 8,
+    glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+    sources: {
+      sat:   raster(esriTile('World_Imagery'), 19, 'Esri, Maxar'),
+      labels: raster(esriTile('Reference/World_Boundaries_and_Places'), 19),
+      roads: raster(esriTile('Reference/World_Transportation'), 19),
+      topo:  raster(usgsTile('USGSTopo'), 16, 'USGS'),
+      hill:  raster(usgsTile('USGSShadedReliefOnly'), 16),
+      slope: raster(SLOPE, 17, 'USGS 3DEP'),
+      flood: raster(FLOOD, 18, 'FEMA NFHL'),
+    },
+    layers: [
+      { id: 'sat',   type: 'raster', source: 'sat' },
+      { id: 'topo',  type: 'raster', source: 'topo', layout: { visibility: 'none' } },
+      { id: 'hill',  type: 'raster', source: 'hill', paint: { 'raster-opacity': 0.35 } },
+      { id: 'roads', type: 'raster', source: 'roads' },
+      { id: 'labels', type: 'raster', source: 'labels' },
+      { id: 'slope', type: 'raster', source: 'slope', paint: { 'raster-opacity': 0.55 }, layout: { visibility: 'none' } },
+      { id: 'flood', type: 'raster', source: 'flood', paint: { 'raster-opacity': 0.7 }, layout: { visibility: 'none' } },
+    ],
+  },
+});
+map.addControl(new maplibregl.NavigationControl(), 'top-right');
+map.addControl(new maplibregl.GeolocateControl({ trackUserLocation: true }), 'top-right');
+map.addControl(new maplibregl.ScaleControl({ unit: 'imperial' }));
+
+// ---- Layer toggles ---------------------------------------------------------
+const vis = (id, on) => map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+document.querySelectorAll('input[name=base]').forEach(r => r.onchange = () => {
+  const sat = r.value === 'sat' && r.checked;
+  vis('sat', sat); vis('roads', sat); vis('labels', sat); vis('topo', !sat);
+});
+for (const id of ['hill', 'slope', 'flood']) {
+  document.getElementById('lyr-' + id).onchange = e => vis(id, e.target.checked);
+}
+
+// ---- Data ------------------------------------------------------------------
+function parseCSV(text) {
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (c === '"') q = false; else cell += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += c;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  const head = rows.shift().map(h => h.trim());
+  return rows.filter(r => r.some(v => v.trim())).map(r => Object.fromEntries(head.map((h, i) => [h, (r[i] || '').trim()])));
+}
+const num = v => (v === '' || v == null || isNaN(+v)) ? null : +v;
+
+let listings = [], boundaries = { type: 'FeatureCollection', features: [] };
+
+async function load() {
+  listings = parseCSV(await (await fetch('listings.csv', { cache: 'no-store' })).text())
+    .filter(l => num(l.lat) != null && num(l.lng) != null)
+    .map(l => {
+      for (const k of ['price', 'acres', 'beds', 'baths', 'sqft', 'year_built', 'lat', 'lng', 'drive_min_atl']) l[k] = num(l[k]);
+      l.house = l.beds != null || l.sqft != null;
+      return l;
+    });
+  try { boundaries = await (await fetch('boundaries.geojson', { cache: 'no-store' })).json(); } catch (e) {}
+}
+
+const pts = list => ({ type: 'FeatureCollection', features: list.map(l => ({
+  type: 'Feature', id: listings.indexOf(l),
+  properties: { i: listings.indexOf(l), house: l.house, label: l.price ? '$' + Math.round(l.price / 1000) + 'k' : '' },
+  geometry: { type: 'Point', coordinates: [l.lng, l.lat] },
+})) });
+
+function filtered() {
+  const v = id => num(document.getElementById(id).value);
+  const maxP = v('f-price'), minA = v('f-acres'), minB = v('f-beds'), house = document.getElementById('f-house').checked;
+  return listings.filter(l =>
+    (maxP == null || (l.price != null && l.price <= maxP)) &&
+    (minA == null || (l.acres != null && l.acres >= minA)) &&
+    (minB == null || (l.beds != null && l.beds >= minB)) &&
+    (!house || l.house));
+}
+
+function refresh() {
+  if (!map.getSource('listings')) return;
+  const list = filtered();
+  map.getSource('listings').setData(pts(list));
+  const ids = new Set(list.map(l => l.listing_id));
+  map.getSource('bounds').setData({ ...boundaries, features: boundaries.features.filter(f => ids.has(String(f.properties.listing_id))) });
+  document.getElementById('count').textContent = list.length;
+}
+['f-price', 'f-acres', 'f-beds', 'f-house'].forEach(id => document.getElementById(id).oninput = refresh);
+
+// ---- Card ------------------------------------------------------------------
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const money = n => n == null ? '—' : '$' + Math.round(n).toLocaleString();
+const safeUrl = u => /^https?:\/\//i.test(u) ? u : null;
+
+function showCard(l) {
+  const rows = [
+    ['Price', money(l.price)],
+    ['Acres', l.acres ?? '—'],
+    ['$ / acre', l.price && l.acres ? money(l.price / l.acres) : '—'],
+  ];
+  if (l.house) rows.push(
+    ['Beds / baths', `${l.beds ?? '—'} / ${l.baths ?? '—'}`],
+    ['Sq ft', l.sqft ? l.sqft.toLocaleString() : '—'],
+    ['$ / sq ft', l.price && l.sqft ? money(l.price / l.sqft) : '—'],
+    ['Year built', l.year_built ?? '—'],
+  );
+  rows.push(['Drive to ATL', l.drive_min_atl ? `${l.drive_min_atl} min` : '— (tap Directions)'], ['Status', l.status || '—']);
+
+  const ll = `${l.lat},${l.lng}`;
+  const links = [
+    safeUrl(l.url) && ['Listing', l.url],
+    ['Directions to ATL', `https://www.google.com/maps/dir/?api=1&origin=${ll}&destination=${ATL}&travelmode=driving`],
+    ['Google Maps', `https://www.google.com/maps/search/?api=1&query=${ll}`],
+    ['County parcel (qPublic)', QPUBLIC],
+    ['FEMA flood map', `https://msc.fema.gov/portal/search?AddressQuery=${ll}`],
+  ].filter(Boolean);
+
+  document.getElementById('card').innerHTML = `
+    <h2>${esc(l.address || l.listing_id)}</h2>
+    <div class="sub">${esc(l.house ? 'House' : 'Land only')} · ${esc(l.source || '')} · ${esc(l.lat.toFixed(5))}, ${esc(l.lng.toFixed(5))}</div>
+    <dl>${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
+    <div class="links">${links.map(([t, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`).join('')}</div>
+    ${l.notes ? `<div class="notes">${esc(l.notes)}</div>` : ''}`;
+  document.getElementById('sheet').classList.add('open');
+}
+document.getElementById('close').onclick = () => document.getElementById('sheet').classList.remove('open');
+
+// ---- Wire up ---------------------------------------------------------------
+// Start once both the data and the map style are ready, whichever comes last.
+let started = false;
+const dataReady = load();
+function tryStart() {
+  if (started || !map.isStyleLoaded()) return;
+  started = true; init();
+}
+dataReady.then(() => {
+  const t = setInterval(() => { tryStart(); if (started) clearInterval(t); }, 150);
+  tryStart();
+});
+
+function init() {
+  map.addSource('bounds', { type: 'geojson', data: boundaries });
+  map.addSource('listings', { type: 'geojson', data: pts(listings) });
+  map.addLayer({ id: 'bounds-fill', type: 'fill', source: 'bounds', paint: { 'fill-color': '#ffc914', 'fill-opacity': 0.15 } });
+  map.addLayer({ id: 'bounds-line', type: 'line', source: 'bounds', paint: { 'line-color': '#ffc914', 'line-width': 2.5 } });
+  map.addLayer({ id: 'pts', type: 'circle', source: 'listings', paint: {
+    'circle-radius': 8, 'circle-stroke-width': 2, 'circle-stroke-color': '#fff',
+    'circle-color': ['case', ['get', 'house'], '#e4572e', '#ffc914'] } });
+  map.addLayer({ id: 'pts-label', type: 'symbol', source: 'listings', minzoom: 12,
+    layout: { 'text-field': ['get', 'label'], 'text-font': ['Open Sans Semibold'], 'text-size': 12, 'text-offset': [0, 1.4] },
+    paint: { 'text-color': '#fff', 'text-halo-color': '#000', 'text-halo-width': 1.5 } });
+
+  map.on('click', 'pts', e => {
+    const l = listings[e.features[0].properties.i];
+    showCard(l);
+    map.easeTo({ center: [l.lng, l.lat], zoom: Math.max(map.getZoom(), 15) });
+  });
+  map.on('click', 'bounds-fill', e => {
+    const l = listings.find(x => x.listing_id === String(e.features[0].properties.listing_id));
+    if (l) showCard(l);
+  });
+  for (const id of ['pts', 'bounds-fill']) {
+    map.on('mouseenter', id, () => map.getCanvas().style.cursor = 'pointer');
+    map.on('mouseleave', id, () => map.getCanvas().style.cursor = '');
+  }
+  refresh();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,3 @@
+listing_id,url,source,status,price,acres,beds,baths,sqft,year_built,lat,lng,drive_min_atl,address,notes
+EX-1,https://example.com/replace-me,example,active,325000,4.2,3,2,1650,1998,34.8805,-83.3990,,EXAMPLE near Clayton - replace with a real listing,Sample row so the map shows something. Delete it.
+EX-2,https://example.com/replace-me-too,example,active,89000,11.5,,,,,34.9410,-83.4680,,EXAMPLE land only - replace,Sample land-only row (no house). Delete it.

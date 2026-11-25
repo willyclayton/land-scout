@@ -1,0 +1,13 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "listing_id": "EX-1" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-83.4010,34.8795],[-83.3970,34.8795],[-83.3968,34.8818],[-83.4008,34.8820],[-83.4010,34.8795]]]
+      }
+    }
+  ]
+}
