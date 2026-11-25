@@ -35,7 +35,9 @@ The two `EX-` rows are fake sample rows. Delete them.
 ## What's on the map
 
 - Satellite or USGS topo base map, with hillshade
+- Roads and road names, streams and lakes, towns, mountain peaks with elevations, places (stores, churches, trailheads), public land and national forest, building outlines, the county line, and contour lines (from OpenStreetMap and USGS)
 - Slope (USGS 3DEP) and FEMA flood zones, which you can turn on and off
+- Tap any spot on the map for its elevation, FEMA flood zone, whether it's public land, the nearest road and water, and straight-line miles to Clayton and Atlanta. Listing cards show the same site info
 - Listings: red = house, yellow = land only, with price labels
 - Tap a listing for price, acres, $/acre, beds and baths, sq ft, $/sq ft, year built, drive time, and links to the listing, directions to Atlanta, the county parcel record (qPublic), and FEMA's flood map
 - Filters: max price, min acres, min beds, has a house

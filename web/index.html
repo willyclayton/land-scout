@@ -37,6 +37,8 @@
   .links a { display:inline-block; margin:0 8px 8px 0; padding:6px 10px; border:1px solid var(--line);
     border-radius:8px; color:var(--accent); text-decoration:none; }
   .notes { white-space:pre-wrap; border-top:1px solid var(--line); padding-top:8px; }
+  h4.sec { margin:14px 0 6px; font-size:12px; text-transform:uppercase; color:var(--muted); border-top:1px solid var(--line); padding-top:10px; }
+  .hint { color:var(--muted); font-size:12px; margin-top:4px; }
   .legend span { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; }
 </style>
 </head>
@@ -49,9 +51,17 @@
   <label><input type="radio" name="base" value="sat" checked> Satellite</label>
   <label><input type="radio" name="base" value="topo"> Topo</label>
   <h4>Layers</h4>
+  <label><input type="checkbox" id="lyr-roads" checked> Roads &amp; road names</label>
+  <label><input type="checkbox" id="lyr-water" checked> Streams &amp; lakes</label>
+  <label><input type="checkbox" id="lyr-places" checked> Towns, peaks &amp; places</label>
+  <label><input type="checkbox" id="lyr-public" checked> Public land / forest</label>
+  <label><input type="checkbox" id="lyr-bldg" checked> Buildings</label>
+  <label><input type="checkbox" id="lyr-contours"> Contour lines</label>
   <label><input type="checkbox" id="lyr-hill" checked> Hillshade</label>
   <label><input type="checkbox" id="lyr-slope"> Slope</label>
   <label><input type="checkbox" id="lyr-flood"> FEMA flood zones</label>
+  <div class="hint">Slope: green flat → red steep. Flood: blue/teal = FEMA zones.</div>
+  <div class="hint">Tap anywhere for elevation &amp; flood zone.</div>
   <h4>Filters</h4>
   <label>Max price $ <input type="number" id="f-price" step="10000" placeholder="any"></label>
   <label>Min acres <input type="number" id="f-acres" step="0.5" placeholder="any"></label>
@@ -76,6 +86,10 @@ const FLOOD = `https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServ
 const SLOPE = `https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage?${BBOX}&format=png&renderingRule=` +
   encodeURIComponent(JSON.stringify({ rasterFunction: 'Slope Map' }));
 
+const CONTOURS = `https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/export?${BBOX}&format=png32&transparent=true`;
+const OMT = 'https://tiles.openfreemap.org/planet';   // OpenStreetMap vector data, free, no key
+const FONT = ['Noto Sans Regular'], FONT_BOLD = ['Noto Sans Bold'];
+
 const raster = (tiles, maxzoom = 19, attribution = '') => ({ type: 'raster', tiles: [tiles], tileSize: 256, maxzoom, attribution });
 
 const map = new maplibregl.Map({
@@ -83,24 +97,83 @@ const map = new maplibregl.Map({
   center: CENTER, zoom: 11,
   style: {
     version: 8,
-    glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+    glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
     sources: {
       sat:   raster(esriTile('World_Imagery'), 19, 'Esri, Maxar'),
-      labels: raster(esriTile('Reference/World_Boundaries_and_Places'), 19),
-      roads: raster(esriTile('Reference/World_Transportation'), 19),
+      omt:   { type: 'vector', url: OMT, attribution: '© OpenStreetMap' },
+      contours: raster(CONTOURS, 17, 'USGS'),
       topo:  raster(usgsTile('USGSTopo'), 16, 'USGS'),
       hill:  raster(usgsTile('USGSShadedReliefOnly'), 16),
       slope: raster(SLOPE, 17, 'USGS 3DEP'),
       flood: raster(FLOOD, 18, 'FEMA NFHL'),
+      bounds: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
+      listings: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
     },
     layers: [
       { id: 'sat',   type: 'raster', source: 'sat' },
       { id: 'topo',  type: 'raster', source: 'topo', layout: { visibility: 'none' } },
       { id: 'hill',  type: 'raster', source: 'hill', paint: { 'raster-opacity': 0.35 } },
-      { id: 'roads', type: 'raster', source: 'roads' },
-      { id: 'labels', type: 'raster', source: 'labels' },
+      // Public land (national forest, parks)
+      { id: 'public-fill', type: 'fill', source: 'omt', 'source-layer': 'park',
+        paint: { 'fill-color': '#2e9e4f', 'fill-opacity': 0.12 } },
+      { id: 'public-line', type: 'line', source: 'omt', 'source-layer': 'park',
+        paint: { 'line-color': '#4cd17a', 'line-width': 1.5, 'line-dasharray': [3, 2] } },
+      // Water
+      { id: 'water-line', type: 'line', source: 'omt', 'source-layer': 'water',
+        paint: { 'line-color': '#4fc3ff', 'line-width': 1.2 } },
+      { id: 'streams', type: 'line', source: 'omt', 'source-layer': 'waterway',
+        paint: { 'line-color': '#4fc3ff', 'line-width': ['match', ['get', 'class'], 'river', 2.5, 1.2] } },
+      // Buildings
+      { id: 'bldg', type: 'line', source: 'omt', 'source-layer': 'building', minzoom: 14,
+        paint: { 'line-color': '#ff9ff3', 'line-width': 1.2 } },
+      // Contours
+      { id: 'contours', type: 'raster', source: 'contours', minzoom: 12, paint: { 'raster-opacity': 0.8 }, layout: { visibility: 'none' } },
+      // Roads
+      { id: 'roads', type: 'line', source: 'omt', 'source-layer': 'transportation',
+        filter: ['!in', 'class', 'rail', 'transit', 'ferry'],
+        paint: {
+          'line-color': ['match', ['get', 'class'], ['motorway', 'trunk', 'primary'], '#ffd166', ['secondary', 'tertiary'], '#ffffff', 'track', '#d9b38c', '#e6e6e6'],
+          'line-width': ['interpolate', ['linear'], ['zoom'], 10, ['match', ['get', 'class'], ['motorway', 'trunk', 'primary'], 2, 0.6], 16, ['match', ['get', 'class'], ['motorway', 'trunk', 'primary'], 6, 3]],
+          'line-opacity': 0.85 } },
+      // Labels
+      { id: 'stream-names', type: 'symbol', source: 'omt', 'source-layer': 'waterway', minzoom: 12,
+        layout: { 'symbol-placement': 'line', 'text-field': ['get', 'name'], 'text-font': FONT, 'text-size': 11 },
+        paint: { 'text-color': '#9be0ff', 'text-halo-color': '#000', 'text-halo-width': 1.4 } },
+      { id: 'lake-names', type: 'symbol', source: 'omt', 'source-layer': 'water_name',
+        layout: { 'text-field': ['get', 'name'], 'text-font': FONT, 'text-size': 13 },
+        paint: { 'text-color': '#9be0ff', 'text-halo-color': '#000', 'text-halo-width': 1.4 } },
+      { id: 'road-names', type: 'symbol', source: 'omt', 'source-layer': 'transportation_name', minzoom: 12,
+        layout: { 'symbol-placement': 'line', 'text-field': ['coalesce', ['get', 'name'], ['get', 'ref']], 'text-font': FONT, 'text-size': 11 },
+        paint: { 'text-color': '#fff', 'text-halo-color': '#000', 'text-halo-width': 1.4 } },
+      { id: 'public-names', type: 'symbol', source: 'omt', 'source-layer': 'park', minzoom: 9,
+        layout: { 'text-field': ['get', 'name'], 'text-font': FONT, 'text-size': 12 },
+        paint: { 'text-color': '#8ff0b0', 'text-halo-color': '#000', 'text-halo-width': 1.4 } },
+      { id: 'peaks', type: 'symbol', source: 'omt', 'source-layer': 'mountain_peak', minzoom: 11,
+        layout: { 'text-field': ['concat', '▲ ', ['get', 'name'], ['case', ['has', 'ele_ft'], ['concat', '\n', ['to-string', ['get', 'ele_ft']], ' ft'], '']],
+          'text-font': FONT, 'text-size': 11 },
+        paint: { 'text-color': '#fff', 'text-halo-color': '#000', 'text-halo-width': 1.4 } },
+      { id: 'pois', type: 'symbol', source: 'omt', 'source-layer': 'poi', minzoom: 13,
+        filter: ['has', 'name'],
+        layout: { 'text-field': ['concat', '• ', ['get', 'name']], 'text-font': FONT, 'text-size': 11, 'text-anchor': 'left' },
+        paint: { 'text-color': '#ffe08a', 'text-halo-color': '#000', 'text-halo-width': 1.4 } },
+      { id: 'towns', type: 'symbol', source: 'omt', 'source-layer': 'place',
+        filter: ['in', 'class', 'city', 'town', 'village', 'hamlet'],
+        layout: { 'text-field': ['get', 'name'], 'text-font': FONT_BOLD,
+          'text-size': ['match', ['get', 'class'], ['city', 'town'], 16, 'village', 13, 11] },
+        paint: { 'text-color': '#fff', 'text-halo-color': '#000', 'text-halo-width': 2 } },
+      { id: 'county', type: 'line', source: 'omt', 'source-layer': 'boundary',
+        filter: ['<=', 'admin_level', 6],
+        paint: { 'line-color': '#fff', 'line-width': 1.5, 'line-dasharray': [4, 2], 'line-opacity': 0.7 } },
       { id: 'slope', type: 'raster', source: 'slope', paint: { 'raster-opacity': 0.55 }, layout: { visibility: 'none' } },
       { id: 'flood', type: 'raster', source: 'flood', paint: { 'raster-opacity': 0.7 }, layout: { visibility: 'none' } },
+      { id: 'bounds-fill', type: 'fill', source: 'bounds', paint: { 'fill-color': '#ffc914', 'fill-opacity': 0.15 } },
+      { id: 'bounds-line', type: 'line', source: 'bounds', paint: { 'line-color': '#ffc914', 'line-width': 2.5 } },
+      { id: 'pts', type: 'circle', source: 'listings', paint: {
+        'circle-radius': 8, 'circle-stroke-width': 2, 'circle-stroke-color': '#fff',
+        'circle-color': ['case', ['get', 'house'], '#e4572e', '#ffc914'] } },
+      { id: 'pts-label', type: 'symbol', source: 'listings', minzoom: 12,
+        layout: { 'text-field': ['get', 'label'], 'text-font': FONT_BOLD, 'text-size': 12, 'text-offset': [0, 1.4] },
+        paint: { 'text-color': '#fff', 'text-halo-color': '#000', 'text-halo-width': 1.5 } },
     ],
   },
 });
@@ -112,10 +185,17 @@ map.addControl(new maplibregl.ScaleControl({ unit: 'imperial' }));
 const vis = (id, on) => map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
 document.querySelectorAll('input[name=base]').forEach(r => r.onchange = () => {
   const sat = r.value === 'sat' && r.checked;
-  vis('sat', sat); vis('roads', sat); vis('labels', sat); vis('topo', !sat);
+  vis('sat', sat); vis('topo', !sat);
 });
-for (const id of ['hill', 'slope', 'flood']) {
-  document.getElementById('lyr-' + id).onchange = e => vis(id, e.target.checked);
+const GROUPS = {
+  roads: ['roads', 'road-names'],
+  water: ['water-line', 'streams', 'stream-names', 'lake-names'],
+  places: ['towns', 'peaks', 'pois', 'county'],
+  public: ['public-fill', 'public-line', 'public-names'],
+  bldg: ['bldg'], contours: ['contours'], hill: ['hill'], slope: ['slope'], flood: ['flood'],
+};
+for (const [g, ids] of Object.entries(GROUPS)) {
+  document.getElementById('lyr-' + g).onchange = e => ids.forEach(id => vis(id, e.target.checked));
 }
 
 // ---- Data ------------------------------------------------------------------
@@ -179,6 +259,78 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const money = n => n == null ? '—' : '$' + Math.round(n).toLocaleString();
 const safeUrl = u => /^https?:\/\//i.test(u) ? u : null;
 
+// ---- Spot info: live lookups for any point -----------------------------------
+const CLAYTON = [34.8782, -83.4010];
+const ATL_LL = ATL.split(',').map(Number);
+function miles([lat1, lng1], [lat2, lng2]) {
+  const r = Math.PI / 180, a = Math.sin((lat2 - lat1) * r / 2) ** 2 +
+    Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin((lng2 - lng1) * r / 2) ** 2;
+  return 3958.8 * 2 * Math.asin(Math.sqrt(a));
+}
+async function getJSON(url) {
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 12000);
+  try { const r = await fetch(url, { signal: ctl.signal }); return await r.json(); } finally { clearTimeout(t); }
+}
+async function elevationFt(lat, lng) {
+  const j = await getJSON(`https://epqs.nationalmap.gov/v1/json?x=${lng}&y=${lat}&wkid=4326&units=Feet&includeDate=false`);
+  const v = +j.value; return isFinite(v) && v > -1000 ? `${Math.round(v).toLocaleString()} ft` : '—';
+}
+async function floodZone(lat, lng) {
+  const j = await getJSON('https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28/query?' + new URLSearchParams({
+    geometry: `${lng},${lat}`, geometryType: 'esriGeometryPoint', inSR: '4326', spatialRel: 'esriSpatialRelIntersects',
+    outFields: 'FLD_ZONE,ZONE_SUBTY', returnGeometry: 'false', f: 'json' }));
+  const a = j.features?.[0]?.attributes;
+  if (!a) return 'Not in a mapped zone';
+  const z = a.FLD_ZONE || '?';
+  const risk = /^(A|V)/.test(z) ? 'HIGH RISK' : z === 'X' ? (/0\.2/.test(a.ZONE_SUBTY || '') ? 'moderate' : 'low risk') : '';
+  return `Zone ${z}${risk ? ' · ' + risk : ''}`;
+}
+function nearbyNames(lng, lat) {
+  const p = map.project([lng, lat]), box = [[p.x - 40, p.y - 40], [p.x + 40, p.y + 40]];
+  const names = (layers, pt) => [...new Set(map.queryRenderedFeatures(pt, { layers: layers.filter(id => map.getLayer(id)) })
+    .map(f => f.properties.name || f.properties.ref).filter(Boolean))].slice(0, 3).join(', ');
+  return { publicLand: names(['public-fill'], p), roads: names(['roads'], box), water: names(['streams', 'water-line'], box) };
+}
+let lookupToken = 0;
+function siteRows(lat, lng) {
+  const near = nearbyNames(lng, lat);
+  return [
+    ['Elevation', '<span id="s-elev">…</span>', true],
+    ['Flood zone', '<span id="s-flood">…</span>', true],
+    ['Public land', near.publicLand || 'No (private / unknown)'],
+    ['Nearby road', near.roads || '— (zoom in)'],
+    ['Nearby water', near.water || '—'],
+    ['To Clayton', `${miles([lat, lng], CLAYTON).toFixed(1)} mi straight line`],
+    ['To Atlanta', `${miles([lat, lng], ATL_LL).toFixed(0)} mi straight line`],
+  ];
+}
+function fillSite(lat, lng) {
+  const tok = ++lookupToken;
+  const set = (id, p) => p.then(v => v, () => 'lookup failed').then(v => {
+    const el = document.getElementById(id); if (el && tok === lookupToken) el.textContent = v; });
+  set('s-elev', elevationFt(lat, lng));
+  set('s-flood', floodZone(lat, lng));
+}
+const dl = rows => `<dl>${rows.map(([k, v, raw]) => `<dt>${esc(k)}</dt><dd>${raw ? v : esc(v)}</dd>`).join('')}</dl>`;
+const linkRow = links => `<div class="links">${links.filter(Boolean).map(([t, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`).join('')}</div>`;
+const placeLinks = ll => [
+  ['Directions to ATL', `https://www.google.com/maps/dir/?api=1&origin=${ll}&destination=${ATL}&travelmode=driving`],
+  ['Google Maps', `https://www.google.com/maps/search/?api=1&query=${ll}`],
+  ['Street View', `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${ll}`],
+  ['County parcel (qPublic)', QPUBLIC],
+  ['FEMA flood map', `https://msc.fema.gov/portal/search?AddressQuery=${ll}`],
+];
+
+function showSpot(lat, lng) {
+  document.getElementById('card').innerHTML = `
+    <h2>Spot info</h2>
+    <div class="sub">${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
+    ${dl(siteRows(lat, lng))}
+    ${linkRow(placeLinks(`${lat},${lng}`))}`;
+  document.getElementById('sheet').classList.add('open');
+  fillSite(lat, lng);
+}
+
 function showCard(l) {
   const rows = [
     ['Price', money(l.price)],
@@ -194,21 +346,17 @@ function showCard(l) {
   rows.push(['Drive to ATL', l.drive_min_atl ? `${l.drive_min_atl} min` : '— (tap Directions)'], ['Status', l.status || '—']);
 
   const ll = `${l.lat},${l.lng}`;
-  const links = [
-    safeUrl(l.url) && ['Listing', l.url],
-    ['Directions to ATL', `https://www.google.com/maps/dir/?api=1&origin=${ll}&destination=${ATL}&travelmode=driving`],
-    ['Google Maps', `https://www.google.com/maps/search/?api=1&query=${ll}`],
-    ['County parcel (qPublic)', QPUBLIC],
-    ['FEMA flood map', `https://msc.fema.gov/portal/search?AddressQuery=${ll}`],
-  ].filter(Boolean);
 
   document.getElementById('card').innerHTML = `
     <h2>${esc(l.address || l.listing_id)}</h2>
     <div class="sub">${esc(l.house ? 'House' : 'Land only')} · ${esc(l.source || '')} · ${esc(l.lat.toFixed(5))}, ${esc(l.lng.toFixed(5))}</div>
-    <dl>${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
-    <div class="links">${links.map(([t, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`).join('')}</div>
-    ${l.notes ? `<div class="notes">${esc(l.notes)}</div>` : ''}`;
+    ${dl(rows)}
+    ${linkRow([safeUrl(l.url) && ['Listing', l.url], ...placeLinks(ll)])}
+    ${l.notes ? `<div class="notes">${esc(l.notes)}</div>` : ''}
+    <h4 class="sec">The site</h4>
+    ${dl(siteRows(l.lat, l.lng))}`;
   document.getElementById('sheet').classList.add('open');
+  fillSite(l.lat, l.lng);
 }
 document.getElementById('close').onclick = () => document.getElementById('sheet').classList.remove('open');
 
@@ -217,7 +365,7 @@ document.getElementById('close').onclick = () => document.getElementById('sheet'
 let started = false;
 const dataReady = load();
 function tryStart() {
-  if (started || !map.isStyleLoaded()) return;
+  if (started || !map.getSource('listings')) return;
   started = true; init();
 }
 dataReady.then(() => {
@@ -226,17 +374,6 @@ dataReady.then(() => {
 });
 
 function init() {
-  map.addSource('bounds', { type: 'geojson', data: boundaries });
-  map.addSource('listings', { type: 'geojson', data: pts(listings) });
-  map.addLayer({ id: 'bounds-fill', type: 'fill', source: 'bounds', paint: { 'fill-color': '#ffc914', 'fill-opacity': 0.15 } });
-  map.addLayer({ id: 'bounds-line', type: 'line', source: 'bounds', paint: { 'line-color': '#ffc914', 'line-width': 2.5 } });
-  map.addLayer({ id: 'pts', type: 'circle', source: 'listings', paint: {
-    'circle-radius': 8, 'circle-stroke-width': 2, 'circle-stroke-color': '#fff',
-    'circle-color': ['case', ['get', 'house'], '#e4572e', '#ffc914'] } });
-  map.addLayer({ id: 'pts-label', type: 'symbol', source: 'listings', minzoom: 12,
-    layout: { 'text-field': ['get', 'label'], 'text-font': ['Open Sans Semibold'], 'text-size': 12, 'text-offset': [0, 1.4] },
-    paint: { 'text-color': '#fff', 'text-halo-color': '#000', 'text-halo-width': 1.5 } });
-
   map.on('click', 'pts', e => {
     const l = listings[e.features[0].properties.i];
     showCard(l);
@@ -245,6 +382,11 @@ function init() {
   map.on('click', 'bounds-fill', e => {
     const l = listings.find(x => x.listing_id === String(e.features[0].properties.listing_id));
     if (l) showCard(l);
+  });
+  // Tap anywhere else: spot info
+  map.on('click', e => {
+    const hit = map.queryRenderedFeatures(e.point, { layers: ['pts', 'bounds-fill'] });
+    if (!hit.length) showSpot(e.lngLat.lat, e.lngLat.lng);
   });
   for (const id of ['pts', 'bounds-fill']) {
     map.on('mouseenter', id, () => map.getCanvas().style.cursor = 'pointer');
