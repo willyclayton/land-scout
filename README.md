@@ -42,7 +42,7 @@ One-time setup:
 2. In GitHub, go to the repo's **Settings → Secrets and variables → Actions**. Add a secret named `RENTCAST_API_KEY` with the key.
 3. Go to **Actions → Pull Rabun listings (RentCast) → Run workflow** to run it now instead of waiting for Monday.
 
-**API calls:** one search covers the whole county. After that, each listing costs one call for its tax and sale record, the first time only, because records are cached in `data/rentcast_cache.json`. Each run stops at `MAX_CALLS` (default 10) so it stays inside the free tier. Records for remaining listings fill in on later runs. On a paid plan, set a repo **variable** `MAX_CALLS` (for example 500) under Settings → Secrets and variables → Actions → Variables, and everything fills in on the first run.
+**API calls:** one search covers the whole county. After that, each listing costs one call for its tax and sale record, the first time only, because records are cached in `data/rentcast_cache.json`. Each run stops at `MAX_CALLS` (default 10). There is also a hard monthly cap, `MONTHLY_CAP` (default 45), counted across all runs including manual ones and failed calls, so the job can never go past the free tier's 50 a month. Records for remaining listings fill in on later runs. On a paid plan, set repo **variables** `MAX_CALLS` and `MONTHLY_CAP` to fit your plan (for example 500 and 950) under Settings → Secrets and variables → Actions → Variables, and everything fills in on the first run.
 
 Your own rows in `listings.csv` are matched to a RentCast listing at the same spot. If there isn't one, the script looks up the `address` instead. What you typed by hand always wins. Listings you added yourself have a blue ring on the map.
 

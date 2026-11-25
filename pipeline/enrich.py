@@ -12,6 +12,9 @@ write web/rentcast.json for the map.
 Env:
   RENTCAST_API_KEY   required
   MAX_CALLS          max API calls this run (default 10)
+  MONTHLY_CAP        max API calls per calendar month, across all runs (default 45).
+                     Tracked in data/rentcast_cache.json. Keeps you under the
+                     free tier's 50 so you can't be billed for overages.
   RENTCAST_BASE      API base URL (default https://api.rentcast.io/v1)
 Standard library only, so no pip install is needed.
 """
@@ -34,6 +37,8 @@ MINE = ROOT / "web" / "listings.csv"
 BASE = os.environ.get("RENTCAST_BASE", "https://api.rentcast.io/v1").rstrip("/")
 KEY = os.environ.get("RENTCAST_API_KEY", "")
 MAX_CALLS = int(os.environ.get("MAX_CALLS") or 10)
+MONTHLY_CAP = int(os.environ.get("MONTHLY_CAP") or 45)
+MONTH = time.strftime("%Y-%m")
 
 # A circle that covers all of Rabun County; results are then filtered by county.
 CENTER = (34.88, -83.42)
@@ -45,6 +50,10 @@ calls = 0
 
 
 class OutOfCalls(Exception):
+    pass
+
+
+class ApiError(Exception):
     pass
 
 
@@ -66,7 +75,12 @@ def api(path, **params):
                 time.sleep(5 * (attempt + 1))
                 continue
             body = e.read().decode("utf-8", "replace")[:300]
-            sys.exit(f"RentCast error {e.code} on /{path}: {body}")
+            raise ApiError(f"RentCast error {e.code} on /{path}: {body}")
+        except (urllib.error.URLError, OSError) as e:
+            if attempt < 2:
+                time.sleep(5 * (attempt + 1))
+                continue
+            raise ApiError(f"Could not reach RentCast on /{path}: {e}")
 
 
 def miles(a, b):
@@ -169,11 +183,26 @@ def load_json(path, default):
         return default
 
 
+def save_cache(cache):
+    usage = cache.setdefault("_usage", {})
+    usage[MONTH] = usage.get(MONTH, 0) + calls
+    CACHE.parent.mkdir(parents=True, exist_ok=True)
+    CACHE.write_text(json.dumps(cache, indent=0, sort_keys=True))
+
+
 def main():
     if not KEY:
         sys.exit("Set RENTCAST_API_KEY (in GitHub: Settings > Secrets and variables > Actions).")
 
+    global MAX_CALLS
     cache = load_json(CACHE, {})
+    usage = cache.setdefault("_usage", {})
+    used_this_month = usage.get(MONTH, 0)
+    MAX_CALLS = min(MAX_CALLS, MONTHLY_CAP - used_this_month)
+    print(f"{used_this_month} of {MONTHLY_CAP} calls already used in {MONTH}; this run may use {max(MAX_CALLS, 0)}.")
+    if MAX_CALLS <= 0:
+        print("Monthly cap reached. Nothing to do until next month.")
+        return
     previous = {l["id"]: l for l in load_json(OUT, {}).get("listings", [])}
     note = None
 
@@ -221,8 +250,7 @@ def main():
                     if rec:
                         mine[lid] = {"record": slim_record(rec)}
 
-    CACHE.parent.mkdir(parents=True, exist_ok=True)
-    CACHE.write_text(json.dumps(cache, indent=0, sort_keys=True))
+    save_cache(cache)
     OUT.write_text(json.dumps({
         "updated": time.strftime("%Y-%m-%d"),
         "source": "RentCast",
@@ -236,4 +264,10 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except ApiError as e:
+        # Still record the calls we spent, so the monthly cap stays accurate.
+        c = load_json(CACHE, {})
+        save_cache(c)
+        sys.exit(str(e))
