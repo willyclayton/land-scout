@@ -1,0 +1,415 @@
+{
+"_usage": {
+"2026-11": 10
+},
+"listing:12-Bobcat-Ln,-Lakemont,-GA-30552": {
+"addressLine1": "12 Bobcat Ln",
+"addressLine2": null,
+"assessorID": "LR06 002",
+"bathrooms": 3,
+"bedrooms": 3,
+"city": "Lakemont",
+"county": "Rabun",
+"countyFips": "241",
+"features": {
+"cooling": true,
+"coolingType": "Central",
+"exteriorType": "Other",
+"fireplace": true,
+"foundationType": "Footing",
+"heating": true,
+"heatingType": "Heat Pump",
+"roofType": "Metal"
+},
+"formattedAddress": "12 Bobcat Ln, Lakemont, GA 30552",
+"history": {
+"2020-07-27": {
+"date": "2020-07-27T00:00:00.000Z",
+"event": "Sale",
+"price": 491500
+}
+},
+"hoa": {
+"fee": 42
+},
+"id": "12-Bobcat-Ln,-Lakemont,-GA-30552",
+"lastSaleDate": "2020-07-27T00:00:00.000Z",
+"lastSalePrice": 491500,
+"latitude": 34.761519,
+"legalDescription": "LOT 18",
+"longitude": -83.434185,
+"lotSize": 19602,
+"owner": {
+"mailingAddress": {
+"addressLine1": "4771 Powers Ferry Rd",
+"addressLine2": null,
+"city": "Atlanta",
+"formattedAddress": "4771 Powers Ferry Rd, Atlanta, GA 30327",
+"id": "4771-Powers-Ferry-Rd,-Atlanta,-GA-30327",
+"state": "GA",
+"stateFips": "13",
+"zipCode": "30327"
+},
+"names": [
+"Margaret Lamb",
+"Steven M Barnard"
+],
+"type": "Individual"
+},
+"ownerOccupied": false,
+"propertyTaxes": {
+"2024": {
+"total": 2220,
+"year": 2024
+},
+"2025": {
+"total": 2308,
+"year": 2025
+}
+},
+"propertyType": "Single Family",
+"squareFootage": 1750,
+"state": "GA",
+"stateFips": "13",
+"subdivision": "LAKE RABUN ESTATES",
+"taxAssessments": {
+"2024": {
+"improvements": 98304,
+"land": 40000,
+"value": 138304,
+"year": 2024
+},
+"2025": {
+"improvements": 103810,
+"land": 40000,
+"value": 143810,
+"year": 2025
+}
+},
+"yearBuilt": 1986,
+"zipCode": "30552",
+"zoning": "R1"
+},
+"listing:24-Turtle-Hill-Ln,-Clayton,-GA-30525": {
+"addressLine1": "24 Turtle Hill Ln",
+"addressLine2": null,
+"assessorID": "C008 017",
+"bathrooms": 3,
+"bedrooms": 3,
+"city": "Clayton",
+"county": "Rabun",
+"countyFips": "241",
+"features": {
+"cooling": true,
+"coolingType": "Central",
+"exteriorType": "Wood",
+"fireplace": true,
+"foundationType": "Footing",
+"garage": true,
+"garageType": "Carport",
+"heating": true,
+"heatingType": "Heat Pump",
+"roofType": "Composition Shingle"
+},
+"formattedAddress": "24 Turtle Hill Ln, Clayton, GA 30525",
+"history": {
+"2022-03-11": {
+"date": "2022-03-11T00:00:00.000Z",
+"event": "Sale",
+"price": 285000
+}
+},
+"id": "24-Turtle-Hill-Ln,-Clayton,-GA-30525",
+"lastSaleDate": "2022-03-11T00:00:00.000Z",
+"lastSalePrice": 285000,
+"latitude": 34.872528,
+"legalDescription": "LT 66",
+"longitude": -83.403697,
+"lotSize": 25265,
+"owner": {
+"mailingAddress": {
+"addressLine1": "24 Turtle Hill Ln",
+"addressLine2": null,
+"city": "Clayton",
+"formattedAddress": "24 Turtle Hill Ln, Clayton, GA 30525",
+"id": "24-Turtle-Hill-Ln,-Clayton,-GA-30525",
+"state": "GA",
+"stateFips": "13",
+"zipCode": "30525"
+},
+"names": [
+"Casey H Cryer"
+],
+"type": "Individual"
+},
+"ownerOccupied": true,
+"propertyTaxes": {
+"2023": {
+"total": 1922,
+"year": 2023
+},
+"2025": {
+"total": 1995,
+"year": 2025
+}
+},
+"propertyType": "Single Family",
+"squareFootage": 1542,
+"state": "GA",
+"stateFips": "13",
+"subdivision": "SHADY SIDE",
+"taxAssessments": {
+"2023": {
+"improvements": 70891,
+"land": 4800,
+"value": 75691,
+"year": 2023
+},
+"2025": {
+"improvements": 83100,
+"land": 7200,
+"value": 90300,
+"year": 2025
+}
+},
+"yearBuilt": 2006,
+"zipCode": "30525",
+"zoning": "R1"
+},
+"listing:3-Round-Top-Dr,-Clayton,-GA-30525": {
+"addressLine1": "3 Round Top Dr",
+"addressLine2": null,
+"bathrooms": 3,
+"bedrooms": 4,
+"city": "Clayton",
+"county": "Rabun",
+"countyFips": "241",
+"formattedAddress": "3 Round Top Dr, Clayton, GA 30525",
+"hoa": {
+"fee": 40
+},
+"id": "3-Round-Top-Dr,-Clayton,-GA-30525",
+"latitude": 34.897444,
+"longitude": -83.46964,
+"lotSize": 95396,
+"propertyType": "Single Family",
+"squareFootage": 2490,
+"state": "GA",
+"stateFips": "13",
+"yearBuilt": 1999,
+"zipCode": "30525"
+},
+"listing:453-Number-10-Ln,-Clayton,-GA-30525": {
+"addressLine1": "453 Number 10 Ln",
+"addressLine2": null,
+"assessorID": "042C 008A",
+"bathrooms": 3.5,
+"bedrooms": 3,
+"city": "Clayton",
+"county": "Rabun",
+"countyFips": "241",
+"features": {
+"architectureType": "Log Cabin / Rustic",
+"cooling": true,
+"coolingType": "Central",
+"exteriorType": "Wood Shingle",
+"fireplace": true,
+"foundationType": "Footing",
+"garage": true,
+"garageType": "Garage",
+"heating": true,
+"heatingType": "Heat Pump",
+"roofType": "Metal"
+},
+"formattedAddress": "453 Number 10 Ln, Clayton, GA 30525",
+"history": {
+"2012-04-09": {
+"date": "2012-04-09T00:00:00.000Z",
+"event": "Sale",
+"price": 189000
+}
+},
+"id": "453-Number-10-Ln,-Clayton,-GA-30525",
+"lastSaleDate": "2012-04-09T00:00:00.000Z",
+"lastSalePrice": 189000,
+"latitude": 34.874233,
+"legalDescription": "LL10 LD2 2011TY SPLIT",
+"longitude": -83.42514,
+"lotSize": 888188,
+"owner": {
+"mailingAddress": {
+"addressLine1": "2779 Manley Martin Rd",
+"addressLine2": null,
+"city": "Danielsville",
+"formattedAddress": "2779 Manley Martin Rd, Danielsville, GA 30633",
+"id": "2779-Manley-Martin-Rd,-Danielsville,-GA-30633",
+"state": "GA",
+"stateFips": "13",
+"zipCode": "30633"
+},
+"names": [
+"KENNETH HOUSE",
+"CYNTHIA HOUSE"
+]
+},
+"ownerOccupied": false,
+"propertyTaxes": {
+"2023": {
+"total": 2671,
+"year": 2023
+}
+},
+"propertyType": "Single Family",
+"squareFootage": 4244,
+"state": "GA",
+"stateFips": "13",
+"taxAssessments": {
+"2023": {
+"improvements": 128126,
+"land": 17792,
+"value": 145918,
+"year": 2023
+}
+},
+"yearBuilt": 2000,
+"zipCode": "30525",
+"zoning": "A"
+},
+"listing:654-Old-Chechero-Rd,-Clayton,-GA-30525": {
+"addressLine1": "654 Old Chechero Rd",
+"addressLine2": null,
+"assessorID": "043B 019 001",
+"bathrooms": 1,
+"bedrooms": 2,
+"city": "Clayton",
+"county": "Rabun",
+"countyFips": "241",
+"features": {
+"architectureType": "Mobile Home",
+"cooling": true,
+"coolingType": "Central",
+"exteriorType": "Metal",
+"fireplace": true,
+"floorCount": 1,
+"foundationType": "Pier / Post & Beam",
+"heating": true,
+"heatingType": "Gravity",
+"roofType": "Gambrel / Wood Shake / Shingle"
+},
+"formattedAddress": "654 Old Chechero Rd, Clayton, GA 30525",
+"id": "654-Old-Chechero-Rd,-Clayton,-GA-30525",
+"latitude": 34.869485,
+"legalDescription": "REDMAN FLAMINGO 11417628",
+"longitude": -83.392037,
+"lotSize": 30492,
+"owner": {
+"mailingAddress": {
+"addressLine1": "PO BOX 774",
+"addressLine2": null,
+"city": "Clayton",
+"formattedAddress": "PO BOX 774, Clayton, GA 30525",
+"id": "PO-BOX-774,-Clayton,-GA-30525",
+"state": "GA",
+"stateFips": "13",
+"zipCode": "30525"
+},
+"names": [
+"BSK LLC"
+],
+"type": "Organization"
+},
+"ownerOccupied": false,
+"propertyType": "Land",
+"squareFootage": 924,
+"state": "GA",
+"stateFips": "13",
+"taxAssessments": {
+"2023": {
+"improvements": 2833,
+"value": 2833,
+"year": 2023
+}
+},
+"yearBuilt": 1985,
+"zipCode": "30525"
+},
+"listing:660-Long-Mountain-Dr,-Lakemont,-GA-30552": {
+"addressLine1": "660 Long Mountain Dr",
+"addressLine2": null,
+"bathrooms": 3,
+"bedrooms": 3,
+"city": "Lakemont",
+"county": "Rabun",
+"countyFips": "241",
+"formattedAddress": "660 Long Mountain Dr, Lakemont, GA 30552",
+"history": {
+"2023-06-09": {
+"date": "2023-06-09T00:00:00.000Z",
+"event": "Sale",
+"price": 467000
+}
+},
+"hoa": {
+"fee": 75
+},
+"id": "660-Long-Mountain-Dr,-Lakemont,-GA-30552",
+"lastSaleDate": "2023-06-09T00:00:00.000Z",
+"lastSalePrice": 467000,
+"latitude": 34.804584,
+"longitude": -83.437953,
+"lotSize": 98446,
+"propertyType": "Single Family",
+"squareFootage": 2208,
+"state": "GA",
+"stateFips": "13",
+"yearBuilt": 2005,
+"zipCode": "30552"
+},
+"listing:River-Vista-Dr,-Lot-390,-Dillard,-GA-30537": {
+"addressLine1": "River Vista Dr",
+"addressLine2": "Lot 390",
+"city": "Dillard",
+"county": "Rabun",
+"countyFips": "241",
+"formattedAddress": "River Vista Dr, Lot 390, Dillard, GA 30537",
+"hoa": {
+"fee": 171
+},
+"id": "River-Vista-Dr,-Lot-390,-Dillard,-GA-30537",
+"latitude": 34.984523,
+"longitude": -83.365689,
+"lotSize": 2614,
+"propertyType": "Land",
+"state": "GA",
+"stateFips": "13",
+"zipCode": "30537"
+},
+"listing:Tiger-Pass-Dr,-Unit-31,-Tiger,-GA-30576": {
+"addressLine1": "Tiger Pass Dr",
+"addressLine2": "Unit 31",
+"city": "Tiger",
+"county": "Rabun",
+"countyFips": "241",
+"formattedAddress": "Tiger Pass Dr, Unit 31, Tiger, GA 30576",
+"history": {
+"2025-12-16": {
+"date": "2025-12-16T00:00:00.000Z",
+"event": "Sale",
+"price": 315250
+}
+},
+"hoa": {
+"fee": 42
+},
+"id": "Tiger-Pass-Dr,-Unit-31,-Tiger,-GA-30576",
+"lastSaleDate": "2025-12-16T00:00:00.000Z",
+"lastSalePrice": 315250,
+"latitude": 34.860732,
+"longitude": -83.442226,
+"lotSize": 157252,
+"propertyType": "Land",
+"state": "GA",
+"stateFips": "13",
+"zipCode": "30576"
+}
+}
