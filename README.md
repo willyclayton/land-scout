@@ -52,9 +52,8 @@ Your own rows in `listings.csv` are matched to a RentCast listing at the same sp
 - Roads and road names, streams and lakes, towns, mountain peaks with elevations, places (stores, churches, trailheads), public land and national forest, building outlines, the county line, and contour lines (from OpenStreetMap and USGS)
 - Slope (USGS 3DEP) and FEMA flood zones, which you can turn on and off
 - Tap any spot on the map for its elevation, FEMA flood zone, whether it's public land, the nearest road and water, and straight-line miles to Clayton and Atlanta. Listing cards show the same site info
-- Listings: red = house, yellow = land only, with price labels
-- Tap a listing for price, acres, $/acre, beds and baths, sq ft, $/sq ft, year built, drive time, and links to the listing, directions to Atlanta, the county parcel record (qPublic), and FEMA's flood map
-- Filters: max price, min acres, min beds, has a house
+- Zillow-style layout: price tags on the map (red = house, amber = land, purple = condo/multi-family, blue = yours), a sortable list of the listings on screen, and filters for price, beds and baths, home type, lot size, sq ft, year built, HOA, days on market and price cuts
+- Each listing has a detail page with aerial photos, an estimated monthly payment, facts and features, price history, the public tax record, the listing agent (tap to call), elevation and flood zone, and links. Detail pages have shareable links
 
 The map layers come live from public Esri, USGS, and FEMA servers. No API keys are needed.
 

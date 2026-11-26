@@ -3,105 +3,278 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Land Scout</title>
+<title>Land Scout · Rabun County</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <style>
-  :root { --bg:#fff; --fg:#1a1a1a; --muted:#666; --line:#e3e3e3; --accent:#0a7d4f; }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg:#1c1c1e; --fg:#f2f2f2; --muted:#a0a0a0; --line:#333; --accent:#3ccf8e; }
+  :root {
+    color-scheme: light;
+    --bg:#fff; --fg:#2a2a33; --muted:#596b82; --line:#d1d1d5; --soft:#f2f2f4;
+    --blue:#006aff; --red:#d6204e; --land:#b86e00; --condo:#7b3fe4;
+    --bar:112px;
   }
-  * { box-sizing: border-box; }
+  @media (min-width: 900px) { :root { --bar:64px; } }
+  * { box-sizing:border-box; }
   html, body { margin:0; height:100%; background:var(--bg); color:var(--fg);
-    font:15px/1.4 -apple-system, system-ui, sans-serif; }
-  #map { position:fixed; inset:0; }
-  .panel { position:absolute; top:10px; left:10px; z-index:2; background:var(--bg);
-    border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,.25); padding:8px 10px; max-width:calc(100vw - 70px); }
-  .panel summary { cursor:pointer; font-weight:600; }
-  .panel label { display:block; margin:6px 0; white-space:nowrap; }
-  .panel input[type=number] { width:100px; }
-  .panel h4 { margin:10px 0 2px; font-size:12px; text-transform:uppercase; color:var(--muted); }
-  #sheet { position:absolute; left:0; right:0; bottom:0; z-index:3; background:var(--bg);
-    border-radius:14px 14px 0 0; box-shadow:0 -2px 12px rgba(0,0,0,.3);
-    padding:14px 16px calc(16px + env(safe-area-inset-bottom)); max-height:65vh; overflow:auto;
-    transform:translateY(110%); transition:transform .2s; }
-  #sheet.open { transform:none; }
-  @media (min-width: 700px) {
-    #sheet { left:auto; right:10px; bottom:auto; top:10px; width:360px; border-radius:12px; }
+    font:15px/1.45 "Open Sans", -apple-system, system-ui, "Segoe UI", sans-serif; }
+  button, input, select { font:inherit; color:inherit; }
+  a { color:var(--blue); }
+
+  /* ---- Top bar ---- */
+  #bar { position:fixed; top:0; left:0; right:0; height:var(--bar); z-index:20; background:var(--bg);
+    border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:8px 12px; }
+  #logo { font-weight:800; color:var(--blue); font-size:19px; white-space:nowrap; letter-spacing:-.3px; }
+  #q { flex:1; min-width:0; height:40px; border:1px solid var(--line); border-radius:8px; padding:0 12px; }
+  #chips { display:flex; gap:8px; overflow-x:auto; width:100%; scrollbar-width:none; }
+  #chips::-webkit-scrollbar { display:none; }
+  @media (min-width: 900px) {
+    #bar { flex-wrap:nowrap; }
+    #q { flex:0 1 320px; }
+    #chips { width:auto; overflow:visible; }
   }
-  #sheet h2 { margin:0 28px 2px 0; font-size:20px; }
-  #sheet .sub { color:var(--muted); margin-bottom:10px; }
-  #close { position:absolute; top:8px; right:10px; border:0; background:none; font-size:24px; color:var(--fg); cursor:pointer; }
-  dl { display:grid; grid-template-columns:auto 1fr; gap:4px 12px; margin:0 0 12px; }
+  .chip > summary { list-style:none; cursor:pointer; height:40px; display:flex; align-items:center; gap:6px;
+    padding:0 14px; border:1px solid var(--line); border-radius:8px; white-space:nowrap; font-weight:600; user-select:none; }
+  .chip > summary::-webkit-details-marker { display:none; }
+  .chip > summary::after { content:"▾"; font-size:11px; color:var(--muted); }
+  .chip.active > summary { border-color:var(--blue); color:var(--blue); background:#eef5ff; }
+  .pop { position:fixed; z-index:30; background:var(--bg); border:1px solid var(--line); border-radius:10px;
+    box-shadow:0 8px 24px rgba(0,0,0,.18); padding:14px 16px; width:320px; max-width:calc(100vw - 16px); max-height:70vh; overflow:auto; }
+  .pop h5 { margin:12px 0 6px; font-size:13px; } .pop h5:first-child { margin-top:0; }
+  .pop label { display:flex; align-items:center; gap:8px; margin:6px 0; }
+  .pop .row { display:flex; gap:8px; align-items:center; }
+  .pop input[type=number] { width:100%; height:38px; border:1px solid var(--line); border-radius:6px; padding:0 8px; }
+  .seg { display:flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .seg button { flex:1; height:36px; border:0; border-right:1px solid var(--line); background:var(--bg); cursor:pointer; }
+  .seg button:last-child { border-right:0; }
+  .seg button.on { background:var(--blue); color:#fff; font-weight:700; }
+  .pop .note { color:var(--muted); font-size:12px; margin-top:8px; }
+
+  /* ---- Layout ---- */
+  #main { position:fixed; top:var(--bar); left:0; right:0; bottom:0; display:flex; }
+  #map { flex:1; position:relative; }
+  #list { width:min(46vw, 700px); overflow-y:auto; border-left:1px solid var(--line); background:var(--bg); }
+  @media (max-width: 899px) {
+    #list { position:absolute; inset:0; width:auto; border:0; display:none; z-index:5; }
+    body.show-list #list { display:block; }
+  }
+  #toggle { display:none; }
+  @media (max-width: 899px) {
+    #toggle { display:block; position:fixed; left:50%; transform:translateX(-50%); bottom:calc(18px + env(safe-area-inset-bottom));
+      z-index:15; background:#1a1a1a; color:#fff; border:0; border-radius:22px; height:44px; padding:0 22px; font-weight:700;
+      box-shadow:0 4px 14px rgba(0,0,0,.3); }
+  }
+
+  /* ---- List ---- */
+  .lhead { padding:14px 16px 6px; }
+  .lhead h1 { font-size:20px; margin:0 0 4px; }
+  .lhead .meta { display:flex; justify-content:space-between; align-items:center; color:var(--muted); font-size:14px; gap:8px; }
+  .lhead select { border:0; font-weight:700; color:var(--blue); background:none; cursor:pointer; }
+  #cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:14px; padding:8px 16px 90px; }
+  .card { border-radius:10px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.18); cursor:pointer; background:var(--bg); }
+  .card:hover { box-shadow:0 3px 12px rgba(0,0,0,.25); }
+  .thumb { position:relative; aspect-ratio:3/2; background:#cfd6cf center/cover; }
+  .thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+  .badge { position:absolute; top:10px; left:10px; background:rgba(255,255,255,.95); color:#111; font-size:12px; font-weight:700;
+    padding:3px 8px; border-radius:4px; }
+  .badge.new { background:var(--red); color:#fff; }
+  .badge.mine { left:auto; right:10px; background:var(--blue); color:#fff; }
+  .cbody { padding:10px 12px 12px; }
+  .price { font-size:22px; font-weight:800; letter-spacing:-.3px; }
+  .facts { font-size:14px; margin-top:2px; }
+  .facts b { font-weight:700; }
+  .sep { color:var(--line); margin:0 6px; font-weight:400; }
+  .addr { font-size:14px; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .by { font-size:11px; color:var(--muted); margin-top:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-transform:uppercase; }
+  #more { display:block; margin:0 auto 90px; height:40px; padding:0 20px; border:1px solid var(--blue); color:var(--blue);
+    background:var(--bg); border-radius:8px; font-weight:700; cursor:pointer; }
+  .empty { padding:30px 16px; color:var(--muted); text-align:center; }
+
+  /* ---- Detail ---- */
+  #detail { position:fixed; inset:0; z-index:40; background:rgba(0,0,0,.45); display:none; }
+  #detail.open { display:block; }
+  .dpanel { position:absolute; background:var(--bg); overflow-y:auto; inset:0; }
+  @media (min-width: 900px) {
+    .dpanel { inset:24px auto 24px 50%; transform:translateX(-50%); width:min(980px, calc(100vw - 48px)); border-radius:12px; }
+  }
+  .dtop { position:sticky; top:0; z-index:2; display:flex; justify-content:space-between; align-items:center; gap:8px;
+    background:var(--bg); border-bottom:1px solid var(--line); padding:8px 12px; }
+  .dtop button { border:0; background:none; font-weight:700; color:var(--blue); cursor:pointer; height:36px; padding:0 8px; }
+  .hero { display:grid; grid-template-columns:2fr 1fr; grid-template-rows:1fr 1fr; gap:4px; height:min(52vw, 420px); }
+  .hero > div { background:#cfd6cf center/cover; position:relative; }
+  .hero > div:first-child { grid-row:1 / 3; }
+  .hero span { position:absolute; left:8px; bottom:8px; background:rgba(0,0,0,.6); color:#fff; font-size:12px; padding:2px 8px; border-radius:4px; }
+  .dbody { padding:16px 20px 40px; display:grid; gap:4px 32px; }
+  @media (min-width: 900px) { .dbody { grid-template-columns:1fr 300px; } .dside { grid-column:2; grid-row:1 / 50; } }
+  .dprice { font-size:30px; font-weight:800; letter-spacing:-.5px; }
+  .dfacts { font-size:18px; } .dfacts b { font-weight:800; }
+  .daddr { font-size:17px; margin-top:2px; }
+  .status { display:inline-flex; align-items:center; gap:6px; margin-top:8px; font-size:14px; }
+  .dot { width:10px; height:10px; border-radius:50%; background:var(--red); display:inline-block; }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:10px; margin:16px 0 4px; }
+  .tile { background:var(--soft); border-radius:8px; padding:10px 12px; }
+  .tile div { font-size:12px; color:var(--muted); } .tile b { font-size:15px; }
+  .dsec h3 { font-size:19px; margin:24px 0 10px; padding-top:16px; border-top:1px solid var(--line); }
+  dl { display:grid; grid-template-columns:minmax(120px, auto) 1fr; gap:6px 16px; margin:0; }
   dt { color:var(--muted); } dd { margin:0; font-weight:600; }
-  .links a { display:inline-block; margin:0 8px 8px 0; padding:6px 10px; border:1px solid var(--line);
-    border-radius:8px; color:var(--accent); text-decoration:none; }
-  .notes { white-space:pre-wrap; border-top:1px solid var(--line); padding-top:8px; }
-  .hist { width:100%; border-collapse:collapse; margin-bottom:12px; font-size:14px; }
-  .hist td { padding:3px 6px 3px 0; border-bottom:1px solid var(--line); }
-  .hist td:last-child { text-align:right; font-weight:600; }
-  dd a { color:var(--accent); }
-  h4.sec { margin:14px 0 6px; font-size:12px; text-transform:uppercase; color:var(--muted); border-top:1px solid var(--line); padding-top:10px; }
-  .hint { color:var(--muted); font-size:12px; margin-top:4px; }
-  .legend span { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; }
+  table.hist { width:100%; border-collapse:collapse; font-size:14px; }
+  .hist th { text-align:left; color:var(--muted); font-weight:600; border-bottom:1px solid var(--line); padding:6px 4px; }
+  .hist td { border-bottom:1px solid var(--soft); padding:8px 4px; }
+  .hist td:last-child, .hist th:last-child { text-align:right; }
+  .notes { white-space:pre-wrap; background:#fffbea; border:1px solid #f1e2a1; border-radius:8px; padding:10px 12px; }
+  .box { border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-top:16px; }
+  .box h4 { margin:0 0 6px; }
+  .btn { display:block; text-align:center; text-decoration:none; font-weight:700; border-radius:8px; padding:11px; margin-top:8px; }
+  .btn.primary { background:var(--blue); color:#fff; }
+  .btn.ghost { border:1px solid var(--blue); color:var(--blue); }
+  .pay { font-size:24px; font-weight:800; }
+  .calc { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin:10px 0; }
+  .calc label { font-size:12px; color:var(--muted); }
+  .calc input { width:100%; height:34px; border:1px solid var(--line); border-radius:6px; padding:0 6px; }
+  .bar3 { display:flex; height:10px; border-radius:5px; overflow:hidden; margin:8px 0; }
+  .legend3 { font-size:13px; } .legend3 div { display:flex; justify-content:space-between; }
+  .legend3 i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; }
+  .links a { display:inline-block; margin:0 10px 8px 0; font-weight:600; }
+
+  /* ---- Map bits ---- */
+  .maplibregl-popup-content { border-radius:10px; padding:12px 14px; font-size:14px; min-width:240px; }
+  .maplibregl-popup-content h4 { margin:0 0 6px; }
+  .maplibregl-popup-content dl { grid-template-columns:auto 1fr; gap:3px 10px; }
+  .pill { color:#fff; font-weight:700; font-size:12px; padding:2px 7px; border-radius:6px; border:1.5px solid #fff;
+    box-shadow:0 1px 4px rgba(0,0,0,.35); cursor:pointer; white-space:nowrap; margin-bottom:6px; }
+  .pill.new::before { content:"NEW "; font-size:9px; opacity:.85; }
+  .pill.hl, .pill:hover { background:#1a1a1a !important; z-index:3; transform:scale(1.12); }
+  .hover-card { position:absolute; z-index:6; width:250px; pointer-events:none; display:none; }
 </style>
 </head>
 <body>
-<div id="map"></div>
 
-<details class="panel" open>
-  <summary>Land Scout · <span id="count">0</span> listings</summary>
-  <h4>Map</h4>
-  <label><input type="radio" name="base" value="sat" checked> Satellite</label>
-  <label><input type="radio" name="base" value="topo"> Topo</label>
-  <h4>Layers</h4>
-  <label><input type="checkbox" id="lyr-roads" checked> Roads &amp; road names</label>
-  <label><input type="checkbox" id="lyr-water" checked> Streams &amp; lakes</label>
-  <label><input type="checkbox" id="lyr-places" checked> Towns, peaks &amp; places</label>
-  <label><input type="checkbox" id="lyr-public" checked> Public land / forest</label>
-  <label><input type="checkbox" id="lyr-bldg" checked> Buildings</label>
-  <label><input type="checkbox" id="lyr-contours"> Contour lines</label>
-  <label><input type="checkbox" id="lyr-hill" checked> Hillshade</label>
-  <label><input type="checkbox" id="lyr-slope"> Slope</label>
-  <label><input type="checkbox" id="lyr-flood"> FEMA flood zones</label>
-  <div class="hint">Slope: green flat → red steep. Flood: blue/teal = FEMA zones.</div>
-  <div class="hint">Tap anywhere for elevation &amp; flood zone.</div>
-  <h4>Filters</h4>
-  <label>Max price $ <input type="number" id="f-price" step="10000" placeholder="any"></label>
-  <label>Min acres <input type="number" id="f-acres" step="0.5" placeholder="any"></label>
-  <label>Min beds <input type="number" id="f-beds" step="1" placeholder="any"></label>
-  <label><input type="checkbox" id="f-house"> Has a house</label>
-  <label>Max days on market <input type="number" id="f-dom" step="10" placeholder="any"></label>
-  <label><input type="checkbox" id="f-mine"> Only my listings</label>
-  <div class="legend"><span style="background:#e4572e"></span>house <span style="background:#ffc914;margin-left:8px"></span>land only <span style="border:2px solid #3ab0ff;margin-left:8px"></span>mine</div>
-  <div class="hint" id="updated"></div>
-</details>
+<header id="bar">
+  <div id="logo">Land Scout</div>
+  <input id="q" type="search" placeholder="Address, city, ZIP, MLS #" autocomplete="off">
+  <div id="chips">
+    <details class="chip" id="c-price"><summary>Price</summary>
+      <div class="pop">
+        <h5>Price range</h5>
+        <div class="row"><input type="number" id="f-pmin" placeholder="No min" step="10000"> – <input type="number" id="f-pmax" placeholder="No max" step="10000"></div>
+      </div>
+    </details>
+    <details class="chip" id="c-beds"><summary>Beds &amp; baths</summary>
+      <div class="pop">
+        <h5>Bedrooms</h5>
+        <div class="seg" data-f="beds"><button data-v="">Any</button><button data-v="1">1+</button><button data-v="2">2+</button><button data-v="3">3+</button><button data-v="4">4+</button><button data-v="5">5+</button></div>
+        <h5>Bathrooms</h5>
+        <div class="seg" data-f="baths"><button data-v="">Any</button><button data-v="1">1+</button><button data-v="1.5">1.5+</button><button data-v="2">2+</button><button data-v="3">3+</button></div>
+      </div>
+    </details>
+    <details class="chip" id="c-type"><summary>Home type</summary>
+      <div class="pop">
+        <h5>Home type</h5>
+        <label><input type="checkbox" name="kind" value="house" checked> Houses</label>
+        <label><input type="checkbox" name="kind" value="land" checked> Land / lots</label>
+        <label><input type="checkbox" name="kind" value="condo" checked> Condos &amp; townhomes</label>
+        <label><input type="checkbox" name="kind" value="multi" checked> Multi-family</label>
+        <label><input type="checkbox" name="kind" value="other" checked> Manufactured &amp; other</label>
+      </div>
+    </details>
+    <details class="chip" id="c-more"><summary>More</summary>
+      <div class="pop">
+        <h5>Lot size (acres)</h5>
+        <div class="row"><input type="number" id="f-amin" placeholder="No min" step="0.5"> – <input type="number" id="f-amax" placeholder="No max" step="0.5"></div>
+        <h5>Square feet</h5>
+        <div class="row"><input type="number" id="f-smin" placeholder="No min" step="100"> – <input type="number" id="f-smax" placeholder="No max" step="100"></div>
+        <h5>Year built</h5>
+        <div class="row"><input type="number" id="f-ymin" placeholder="No min"> – <input type="number" id="f-ymax" placeholder="No max"></div>
+        <h5>Max HOA ($/mo)</h5>
+        <input type="number" id="f-hoa" placeholder="Any" step="25">
+        <h5>Days on market</h5>
+        <div class="seg" data-f="dom"><button data-v="">Any</button><button data-v="1">1 day</button><button data-v="7">7 days</button><button data-v="30">30 days</button><button data-v="90">90 days</button></div>
+        <h5>Other</h5>
+        <label><input type="checkbox" id="f-mine"> Only my saved listings</label>
+        <label><input type="checkbox" id="f-pricecut"> Price cut</label>
+        <button id="reset" class="btn ghost" style="width:100%;background:none;cursor:pointer">Reset all filters</button>
+      </div>
+    </details>
+    <details class="chip" id="c-layers"><summary>Map layers</summary>
+      <div class="pop">
+        <h5>Base map</h5>
+        <div class="seg" data-f="base"><button data-v="sat" class="on">Satellite</button><button data-v="topo">Topo</button></div>
+        <h5>Show on map</h5>
+        <label><input type="checkbox" id="lyr-roads" checked> Roads &amp; road names</label>
+        <label><input type="checkbox" id="lyr-water" checked> Streams &amp; lakes</label>
+        <label><input type="checkbox" id="lyr-places" checked> Towns, peaks &amp; places</label>
+        <label><input type="checkbox" id="lyr-public" checked> Public land / national forest</label>
+        <label><input type="checkbox" id="lyr-bldg" checked> Building outlines</label>
+        <label><input type="checkbox" id="lyr-hill" checked> Hillshade</label>
+        <label><input type="checkbox" id="lyr-contours"> Contour lines</label>
+        <label><input type="checkbox" id="lyr-slope"> Slope (green flat → red steep)</label>
+        <label><input type="checkbox" id="lyr-flood"> FEMA flood zones</label>
+        <div class="note">Tip: tap any spot on the map for its elevation and flood zone.</div>
+      </div>
+    </details>
+  </div>
+</header>
 
-<div id="sheet"><button id="close" aria-label="Close">×</button><div id="card"></div></div>
+<div id="main">
+  <div id="map"></div>
+  <aside id="list">
+    <div class="lhead">
+      <h1>Rabun County GA Real Estate &amp; Land</h1>
+      <div class="meta"><span id="rcount">0 results</span>
+        <label>Sort: <select id="sort">
+          <option value="new">Newest</option>
+          <option value="plo">Price (low to high)</option>
+          <option value="phi">Price (high to low)</option>
+          <option value="ppa">Price per acre</option>
+          <option value="acres">Acres (most)</option>
+          <option value="sqft">Square feet</option>
+          <option value="beds">Bedrooms</option>
+        </select></label>
+      </div>
+      <div class="meta" style="margin-top:4px"><span id="updated"></span></div>
+    </div>
+    <div id="cards"></div>
+    <button id="more" hidden>Show more</button>
+  </aside>
+</div>
+<button id="toggle">List</button>
+
+<div id="detail"><div class="dpanel" id="dpanel"></div></div>
 
 <script>
-// ---- Settings -------------------------------------------------------------
+// ===== Settings =============================================================
 const CENTER = [-83.40, 34.88];               // Clayton, GA
 const ATL = '33.7816,-84.3830';               // Midtown Atlanta
 const QPUBLIC = 'https://qpublic.schneidercorp.com/Application.aspx?App=RabunCountyGA&Layer=Parcels&PageType=Search';
+const PAGE_SIZE = 40;
 
-// Live public map services (loaded by your browser, no keys needed)
+// Live public map services (loaded by the viewer's browser, no keys needed)
 const esriTile = s => `https://server.arcgisonline.com/ArcGIS/rest/services/${s}/MapServer/tile/{z}/{y}/{x}`;
 const usgsTile = s => `https://basemap.nationalmap.gov/arcgis/rest/services/${s}/MapServer/tile/{z}/{y}/{x}`;
 const BBOX = 'bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&f=image';
 const FLOOD = `https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?${BBOX}&format=png32&transparent=true&layers=show:28`;
 const SLOPE = `https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage?${BBOX}&format=png&renderingRule=` +
   encodeURIComponent(JSON.stringify({ rasterFunction: 'Slope Map' }));
-
 const CONTOURS = `https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/export?${BBOX}&format=png32&transparent=true`;
 const OMT = 'https://tiles.openfreemap.org/planet';   // OpenStreetMap vector data, free, no key
 const FONT = ['Noto Sans Regular'], FONT_BOLD = ['Noto Sans Bold'];
+const KIND_COLOR = { house: '#d6204e', land: '#b86e00', condo: '#7b3fe4', multi: '#7b3fe4', other: '#d6204e', mine: '#006aff' };
 
+// Aerial photo of a spot, sized to the lot (Esri World Imagery export)
+function aerial(l, w, h, zoomOut = 1) {
+  const side = Math.max(140, Math.min(1500, Math.sqrt((l.acres || 0.5) * 4047) * 1.6)) * zoomOut;
+  const dLat = side / 2 / 111320, dLng = dLat / Math.cos(l.lat * Math.PI / 180) * (w / h);
+  const bbox = [l.lng - dLng, l.lat - dLat, l.lng + dLng, l.lat + dLat].map(v => v.toFixed(6)).join(',');
+  return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${bbox}&bboxSR=4326&imageSR=3857&size=${w},${h}&format=jpg&f=image`;
+}
+
+// ===== Map ==================================================================
 const raster = (tiles, maxzoom = 19, attribution = '') => ({ type: 'raster', tiles: [tiles], tileSize: 256, maxzoom, attribution });
+const halo = { 'text-halo-color': '#000', 'text-halo-width': 1.4 };
+const EMPTY = { type: 'FeatureCollection', features: [] };
 
 const map = new maplibregl.Map({
   container: 'map',
-  center: CENTER, zoom: 11,
+  center: CENTER, zoom: 10.5,
   style: {
     version: 8,
     glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
@@ -113,75 +286,55 @@ const map = new maplibregl.Map({
       hill:  raster(usgsTile('USGSShadedReliefOnly'), 16),
       slope: raster(SLOPE, 17, 'USGS 3DEP'),
       flood: raster(FLOOD, 18, 'FEMA NFHL'),
-      bounds: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
-      listings: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
+      bounds: { type: 'geojson', data: EMPTY },
+      listings: { type: 'geojson', data: EMPTY },
+      sel: { type: 'geojson', data: EMPTY },
     },
     layers: [
       { id: 'sat',   type: 'raster', source: 'sat' },
       { id: 'topo',  type: 'raster', source: 'topo', layout: { visibility: 'none' } },
       { id: 'hill',  type: 'raster', source: 'hill', paint: { 'raster-opacity': 0.35 } },
-      // Public land (national forest, parks)
-      { id: 'public-fill', type: 'fill', source: 'omt', 'source-layer': 'park',
-        paint: { 'fill-color': '#2e9e4f', 'fill-opacity': 0.12 } },
-      { id: 'public-line', type: 'line', source: 'omt', 'source-layer': 'park',
-        paint: { 'line-color': '#4cd17a', 'line-width': 1.5, 'line-dasharray': [3, 2] } },
-      // Water
-      { id: 'water-line', type: 'line', source: 'omt', 'source-layer': 'water',
-        paint: { 'line-color': '#4fc3ff', 'line-width': 1.2 } },
+      { id: 'public-fill', type: 'fill', source: 'omt', 'source-layer': 'park', paint: { 'fill-color': '#2e9e4f', 'fill-opacity': 0.12 } },
+      { id: 'public-line', type: 'line', source: 'omt', 'source-layer': 'park', paint: { 'line-color': '#4cd17a', 'line-width': 1.5, 'line-dasharray': [3, 2] } },
+      { id: 'water-line', type: 'line', source: 'omt', 'source-layer': 'water', paint: { 'line-color': '#4fc3ff', 'line-width': 1.2 } },
       { id: 'streams', type: 'line', source: 'omt', 'source-layer': 'waterway',
         paint: { 'line-color': '#4fc3ff', 'line-width': ['match', ['get', 'class'], 'river', 2.5, 1.2] } },
-      // Buildings
-      { id: 'bldg', type: 'line', source: 'omt', 'source-layer': 'building', minzoom: 14,
-        paint: { 'line-color': '#ff9ff3', 'line-width': 1.2 } },
-      // Contours
+      { id: 'bldg', type: 'line', source: 'omt', 'source-layer': 'building', minzoom: 14, paint: { 'line-color': '#ff9ff3', 'line-width': 1.2 } },
       { id: 'contours', type: 'raster', source: 'contours', minzoom: 12, paint: { 'raster-opacity': 0.8 }, layout: { visibility: 'none' } },
-      // Roads
       { id: 'roads', type: 'line', source: 'omt', 'source-layer': 'transportation',
         filter: ['!in', 'class', 'rail', 'transit', 'ferry'],
         paint: {
           'line-color': ['match', ['get', 'class'], ['motorway', 'trunk', 'primary'], '#ffd166', ['secondary', 'tertiary'], '#ffffff', 'track', '#d9b38c', '#e6e6e6'],
           'line-width': ['interpolate', ['linear'], ['zoom'], 10, ['match', ['get', 'class'], ['motorway', 'trunk', 'primary'], 2, 0.6], 16, ['match', ['get', 'class'], ['motorway', 'trunk', 'primary'], 6, 3]],
           'line-opacity': 0.85 } },
-      // Labels
       { id: 'stream-names', type: 'symbol', source: 'omt', 'source-layer': 'waterway', minzoom: 12,
-        layout: { 'symbol-placement': 'line', 'text-field': ['get', 'name'], 'text-font': FONT, 'text-size': 11 },
-        paint: { 'text-color': '#9be0ff', 'text-halo-color': '#000', 'text-halo-width': 1.4 } },
+        layout: { 'symbol-placement': 'line', 'text-field': ['get', 'name'], 'text-font': FONT, 'text-size': 11 }, paint: { 'text-color': '#9be0ff', ...halo } },
       { id: 'lake-names', type: 'symbol', source: 'omt', 'source-layer': 'water_name',
-        layout: { 'text-field': ['get', 'name'], 'text-font': FONT, 'text-size': 13 },
-        paint: { 'text-color': '#9be0ff', 'text-halo-color': '#000', 'text-halo-width': 1.4 } },
+        layout: { 'text-field': ['get', 'name'], 'text-font': FONT, 'text-size': 13 }, paint: { 'text-color': '#9be0ff', ...halo } },
       { id: 'road-names', type: 'symbol', source: 'omt', 'source-layer': 'transportation_name', minzoom: 12,
-        layout: { 'symbol-placement': 'line', 'text-field': ['coalesce', ['get', 'name'], ['get', 'ref']], 'text-font': FONT, 'text-size': 11 },
-        paint: { 'text-color': '#fff', 'text-halo-color': '#000', 'text-halo-width': 1.4 } },
+        layout: { 'symbol-placement': 'line', 'text-field': ['coalesce', ['get', 'name'], ['get', 'ref']], 'text-font': FONT, 'text-size': 11 }, paint: { 'text-color': '#fff', ...halo } },
       { id: 'public-names', type: 'symbol', source: 'omt', 'source-layer': 'park', minzoom: 9,
-        layout: { 'text-field': ['get', 'name'], 'text-font': FONT, 'text-size': 12 },
-        paint: { 'text-color': '#8ff0b0', 'text-halo-color': '#000', 'text-halo-width': 1.4 } },
+        layout: { 'text-field': ['get', 'name'], 'text-font': FONT, 'text-size': 12 }, paint: { 'text-color': '#8ff0b0', ...halo } },
       { id: 'peaks', type: 'symbol', source: 'omt', 'source-layer': 'mountain_peak', minzoom: 11,
         layout: { 'text-field': ['concat', '▲ ', ['get', 'name'], ['case', ['has', 'ele_ft'], ['concat', '\n', ['to-string', ['get', 'ele_ft']], ' ft'], '']],
-          'text-font': FONT, 'text-size': 11 },
-        paint: { 'text-color': '#fff', 'text-halo-color': '#000', 'text-halo-width': 1.4 } },
-      { id: 'pois', type: 'symbol', source: 'omt', 'source-layer': 'poi', minzoom: 13,
-        filter: ['has', 'name'],
-        layout: { 'text-field': ['concat', '• ', ['get', 'name']], 'text-font': FONT, 'text-size': 11, 'text-anchor': 'left' },
-        paint: { 'text-color': '#ffe08a', 'text-halo-color': '#000', 'text-halo-width': 1.4 } },
-      { id: 'towns', type: 'symbol', source: 'omt', 'source-layer': 'place',
-        filter: ['in', 'class', 'city', 'town', 'village', 'hamlet'],
-        layout: { 'text-field': ['get', 'name'], 'text-font': FONT_BOLD,
-          'text-size': ['match', ['get', 'class'], ['city', 'town'], 16, 'village', 13, 11] },
+          'text-font': FONT, 'text-size': 11 }, paint: { 'text-color': '#fff', ...halo } },
+      { id: 'pois', type: 'symbol', source: 'omt', 'source-layer': 'poi', minzoom: 14, filter: ['has', 'name'],
+        layout: { 'text-field': ['concat', '• ', ['get', 'name']], 'text-font': FONT, 'text-size': 11, 'text-anchor': 'left' }, paint: { 'text-color': '#ffe08a', ...halo } },
+      { id: 'towns', type: 'symbol', source: 'omt', 'source-layer': 'place', filter: ['in', 'class', 'city', 'town', 'village', 'hamlet'],
+        layout: { 'text-field': ['get', 'name'], 'text-font': FONT_BOLD, 'text-size': ['match', ['get', 'class'], ['city', 'town'], 16, 'village', 13, 11] },
         paint: { 'text-color': '#fff', 'text-halo-color': '#000', 'text-halo-width': 2 } },
-      { id: 'county', type: 'line', source: 'omt', 'source-layer': 'boundary',
-        filter: ['<=', 'admin_level', 6],
+      { id: 'county', type: 'line', source: 'omt', 'source-layer': 'boundary', filter: ['<=', 'admin_level', 6],
         paint: { 'line-color': '#fff', 'line-width': 1.5, 'line-dasharray': [4, 2], 'line-opacity': 0.7 } },
       { id: 'slope', type: 'raster', source: 'slope', paint: { 'raster-opacity': 0.55 }, layout: { visibility: 'none' } },
       { id: 'flood', type: 'raster', source: 'flood', paint: { 'raster-opacity': 0.7 }, layout: { visibility: 'none' } },
-      { id: 'bounds-fill', type: 'fill', source: 'bounds', paint: { 'fill-color': '#ffc914', 'fill-opacity': 0.15 } },
-      { id: 'bounds-line', type: 'line', source: 'bounds', paint: { 'line-color': '#ffc914', 'line-width': 2.5 } },
-      { id: 'pts', type: 'circle', source: 'listings', paint: {
-        'circle-radius': ['case', ['get', 'mine'], 10, 7], 'circle-stroke-width': ['case', ['get', 'mine'], 3, 1.5],
-        'circle-stroke-color': ['case', ['get', 'mine'], '#3ab0ff', '#fff'],
-        'circle-color': ['case', ['get', 'house'], '#e4572e', '#ffc914'] } },
-      { id: 'pts-label', type: 'symbol', source: 'listings', minzoom: 12,
-        layout: { 'text-field': ['get', 'label'], 'text-font': FONT_BOLD, 'text-size': 12, 'text-offset': [0, 1.4] },
-        paint: { 'text-color': '#fff', 'text-halo-color': '#000', 'text-halo-width': 1.5 } },
+      { id: 'bounds-fill', type: 'fill', source: 'bounds', paint: { 'fill-color': '#006aff', 'fill-opacity': 0.12 } },
+      { id: 'bounds-line', type: 'line', source: 'bounds', paint: { 'line-color': '#006aff', 'line-width': 2.5 } },
+      // Listings: small dots; price tags (HTML markers below) appear when zoomed in
+      { id: 'dots', type: 'circle', source: 'listings', paint: {
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 4, 14, 6],
+        'circle-color': ['get', 'color'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5 } },
+      { id: 'sel-ring', type: 'circle', source: 'sel', paint: {
+        'circle-radius': 14, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': '#fff', 'circle-stroke-width': 3 } },
     ],
   },
 });
@@ -189,24 +342,25 @@ map.addControl(new maplibregl.NavigationControl(), 'top-right');
 map.addControl(new maplibregl.GeolocateControl({ trackUserLocation: true }), 'top-right');
 map.addControl(new maplibregl.ScaleControl({ unit: 'imperial' }));
 
-// ---- Layer toggles ---------------------------------------------------------
-const vis = (id, on) => map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
-document.querySelectorAll('input[name=base]').forEach(r => r.onchange = () => {
-  const sat = r.value === 'sat' && r.checked;
-  vis('sat', sat); vis('topo', !sat);
-});
-const GROUPS = {
-  roads: ['roads', 'road-names'],
-  water: ['water-line', 'streams', 'stream-names', 'lake-names'],
-  places: ['towns', 'peaks', 'pois', 'county'],
-  public: ['public-fill', 'public-line', 'public-names'],
-  bldg: ['bldg'], contours: ['contours'], hill: ['hill'], slope: ['slope'], flood: ['flood'],
-};
-for (const [g, ids] of Object.entries(GROUPS)) {
-  document.getElementById('lyr-' + g).onchange = e => ids.forEach(id => vis(id, e.target.checked));
+// Price tags (like Zillow). Plain HTML, so they don't depend on map fonts loading.
+const PILL_ZOOM = 12, PILL_MAX = 250;
+let pillMarkers = new Map();
+function renderPills() {
+  const want = map.getZoom() >= PILL_ZOOM ? inView().slice(0, PILL_MAX) : [];
+  const keep = new Set(want.map(l => l.i));
+  for (const [i, m] of pillMarkers) if (!keep.has(i)) { m.remove(); pillMarkers.delete(i); }
+  for (const l of want) {
+    if (pillMarkers.has(l.i)) continue;
+    const el = document.createElement('div');
+    el.className = 'pill'; el.textContent = short$(l.price) || '?';
+    el.style.background = KIND_COLOR[l.mine ? 'mine' : l.kind];
+    if (isNew(l)) el.classList.add('new');
+    el.addEventListener('click', e => { e.stopPropagation(); openDetail(l, false); });
+    pillMarkers.set(l.i, new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([l.lng, l.lat]).addTo(map));
+  }
 }
 
-// ---- Data ------------------------------------------------------------------
+// ===== Data =================================================================
 function parseCSV(text) {
   const rows = []; let row = [], cell = '', q = false;
   for (let i = 0; i < text.length; i++) {
@@ -223,39 +377,41 @@ function parseCSV(text) {
 }
 const num = v => (v === '' || v == null || isNaN(+v)) ? null : +v;
 
-let listings = [], boundaries = { type: 'FeatureCollection', features: [] };
+let listings = [], boundaries = EMPTY, updated = null;
 
 async function load() {
-  listings = parseCSV(await (await fetch('listings.csv', { cache: 'no-store' })).text())
-    .filter(l => num(l.lat) != null && num(l.lng) != null)
-    .map(l => {
-      for (const k of ['price', 'acres', 'beds', 'baths', 'sqft', 'year_built', 'lat', 'lng', 'drive_min_atl']) l[k] = num(l[k]);
-      l.house = l.beds != null || l.sqft != null;
-      return l;
-    });
-  listings.forEach(l => l.mine = true);
+  try {
+    listings = parseCSV(await (await fetch('listings.csv', { cache: 'no-store' })).text())
+      .filter(l => num(l.lat) != null && num(l.lng) != null && !/^EX-/.test(l.listing_id))
+      .map(l => {
+        for (const k of ['price', 'acres', 'beds', 'baths', 'sqft', 'year_built', 'lat', 'lng', 'drive_min_atl']) l[k] = num(l[k]);
+        l.house = l.beds != null || l.sqft != null; l.mine = true;
+        return l;
+      });
+  } catch (e) { listings = []; }
   try { boundaries = await (await fetch('boundaries.geojson', { cache: 'no-store' })).json(); } catch (e) {}
 
   // RentCast pull (written weekly by the GitHub Action). Optional.
   let rc = null;
   try { rc = await (await fetch('rentcast.json', { cache: 'no-store' })).json(); } catch (e) {}
-  if (!rc) return;
-  updated = rc.updated;
-  const byId = new Map(rc.listings.map(r => [r.id, r]));
-  const claimed = new Set();
-  for (const l of listings) {
-    const m = rc.mine?.[l.listing_id];
-    if (m?.rentcast_id && byId.has(m.rentcast_id)) { attachRC(l, byId.get(m.rentcast_id)); claimed.add(m.rentcast_id); }
-    else if (m?.record) l.record = m.record;
+  if (rc) {
+    updated = rc.updated;
+    const byId = new Map(rc.listings.map(r => [r.id, r]));
+    const claimed = new Set();
+    for (const l of listings) {
+      const m = rc.mine?.[l.listing_id];
+      if (m?.rentcast_id && byId.has(m.rentcast_id)) { attachRC(l, byId.get(m.rentcast_id)); claimed.add(m.rentcast_id); }
+      else if (m?.record) l.record = m.record;
+    }
+    for (const r of rc.listings) {
+      if (claimed.has(r.id)) continue;
+      const l = { listing_id: 'rc-' + r.id, source: 'RentCast', mine: false, notes: '', drive_min_atl: null };
+      attachRC(l, r); listings.push(l);
+    }
   }
-  for (const r of rc.listings) {
-    if (claimed.has(r.id)) continue;
-    const l = { listing_id: 'rc-' + r.id, source: 'RentCast', mine: false, notes: '', drive_min_atl: null };
-    attachRC(l, r); listings.push(l);
-  }
+  listings.forEach((l, i) => { l.i = i; l.kind = kindOf(l); });
 }
-let updated = null;
-// Copy RentCast fields onto a listing, keeping anything you typed by hand.
+// Copy RentCast fields onto a listing, keeping anything typed by hand.
 function attachRC(l, r) {
   l.rc = r; l.record = r.record || l.record;
   for (const [k, v] of Object.entries({ price: r.price, acres: r.acres, beds: r.beds, baths: r.baths, sqft: r.sqft,
@@ -263,43 +419,145 @@ function attachRC(l, r) {
     if (l[k] == null || l[k] === '') l[k] = v;
   l.house = l.beds != null || l.sqft != null || (r.property_type && !/land/i.test(r.property_type));
 }
-
-const pts = list => ({ type: 'FeatureCollection', features: list.map(l => ({
-  type: 'Feature', id: listings.indexOf(l),
-  properties: { i: listings.indexOf(l), house: !!l.house, mine: !!l.mine, label: l.price ? '$' + Math.round(l.price / 1000) + 'k' : '' },
-  geometry: { type: 'Point', coordinates: [l.lng, l.lat] },
-})) });
-
-function filtered() {
-  const v = id => num(document.getElementById(id).value);
-  const maxP = v('f-price'), minA = v('f-acres'), minB = v('f-beds'), maxD = v('f-dom'),
-    house = document.getElementById('f-house').checked, mineOnly = document.getElementById('f-mine').checked;
-  return listings.filter(l =>
-    (maxP == null || (l.price != null && l.price <= maxP)) &&
-    (minA == null || (l.acres != null && l.acres >= minA)) &&
-    (minB == null || (l.beds != null && l.beds >= minB)) &&
-    (maxD == null || (l.rc?.days_on_market != null && l.rc.days_on_market <= maxD)) &&
-    (!mineOnly || l.mine) &&
-    (!house || l.house));
+function kindOf(l) {
+  const t = l.rc?.property_type || '';
+  if (/land/i.test(t)) return 'land';
+  if (/condo|town/i.test(t)) return 'condo';
+  if (/multi/i.test(t)) return 'multi';
+  if (/manufactured|mobile|other/i.test(t)) return 'other';
+  if (t) return 'house';
+  return l.house ? 'house' : 'land';
+}
+const daysOn = l => l.rc?.days_on_market ?? null;
+const isNew = l => daysOn(l) != null && daysOn(l) <= 7;
+function priceCut(l) {
+  const h = (l.rc?.history || []).filter(e => e.price);
+  return h.length > 1 && h[0].price < h[1].price ? h[1].price - h[0].price : 0;
 }
 
-function refresh() {
-  if (!map.getSource('listings')) return;
-  const list = filtered();
-  map.getSource('listings').setData(pts(list));
-  const ids = new Set(list.map(l => l.listing_id));
-  map.getSource('bounds').setData({ ...boundaries, features: boundaries.features.filter(f => ids.has(String(f.properties.listing_id))) });
-  document.getElementById('count').textContent = list.length;
-  document.getElementById('updated').textContent = updated ? `Listings from RentCast, updated ${updated}.` : 'No RentCast data yet (see README).';
-}
-['f-price', 'f-acres', 'f-beds', 'f-house', 'f-dom', 'f-mine'].forEach(id => document.getElementById(id).oninput = refresh);
-
-// ---- Card ------------------------------------------------------------------
+// ===== Formatting ===========================================================
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => n == null ? '—' : '$' + Math.round(n).toLocaleString();
-const safeUrl = u => /^https?:\/\//i.test(u) ? u : null;
+const short$ = n => !n ? '' : n >= 1e6 ? '$' + (n / 1e6).toFixed(n >= 1e7 ? 0 : 2).replace(/\.?0+$/, '') + 'M' : '$' + Math.round(n / 1000) + 'K';
+const safeUrl = u => /^https?:\/\//i.test(u || '') ? u : null;
+const fmtPhone = p => { const d = String(p).replace(/\D/g, '').replace(/^1(?=\d{10}$)/, ''); return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : p; };
+const acresTxt = a => a == null ? null : a >= 10 ? `${Math.round(a)} acres` : `${+a.toFixed(2)} acres`;
+const KIND_LABEL = { house: 'House', land: 'Land', condo: 'Condo / townhome', multi: 'Multi-family', other: 'Manufactured / other' };
+function factsLine(l) {
+  const parts = [];
+  if (l.beds != null) parts.push(`<b>${l.beds}</b> bd`);
+  if (l.baths != null) parts.push(`<b>${l.baths}</b> ba`);
+  if (l.sqft) parts.push(`<b>${l.sqft.toLocaleString()}</b> sqft`);
+  if (l.acres != null) parts.push(`<b>${acresTxt(l.acres).replace(' acres', '')}</b> ${l.kind === 'land' ? 'acres lot' : 'ac'}`);
+  return parts.join('<span class="sep">|</span>') || '—';
+}
 
-// ---- Spot info: live lookups for any point -----------------------------------
+// ===== Filters ==============================================================
+const F = { beds: '', baths: '', dom: '', base: 'sat' };
+const val = id => num(document.getElementById(id).value);
+function filtered() {
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const kinds = new Set([...document.querySelectorAll('input[name=kind]:checked')].map(x => x.value));
+  const pmin = val('f-pmin'), pmax = val('f-pmax'), amin = val('f-amin'), amax = val('f-amax');
+  const smin = val('f-smin'), smax = val('f-smax'), ymin = val('f-ymin'), ymax = val('f-ymax'), hoa = val('f-hoa');
+  const beds = num(F.beds), baths = num(F.baths), dom = num(F.dom);
+  const mine = document.getElementById('f-mine').checked, cut = document.getElementById('f-pricecut').checked;
+  const inRange = (v, lo, hi) => (lo == null || (v != null && v >= lo)) && (hi == null || (v != null && v <= hi));
+  return listings.filter(l =>
+    kinds.has(l.kind) &&
+    inRange(l.price, pmin, pmax) && inRange(l.acres, amin, amax) && inRange(l.sqft, smin, smax) &&
+    inRange(l.year_built, ymin, ymax) &&
+    (beds == null || (l.beds ?? -1) >= beds) && (baths == null || (l.baths ?? -1) >= baths) &&
+    (dom == null || (daysOn(l) != null && daysOn(l) <= dom)) &&
+    (hoa == null || (l.rc?.hoa_fee ?? 0) <= hoa) &&
+    (!mine || l.mine) && (!cut || priceCut(l) > 0) &&
+    (!q || [l.address, l.rc?.city, l.rc?.zip, l.rc?.mls, l.listing_id, l.notes].join(' ').toLowerCase().includes(q)));
+}
+function markActive() {
+  const set = (id, on) => document.getElementById(id).classList.toggle('active', !!on);
+  set('c-price', val('f-pmin') != null || val('f-pmax') != null);
+  set('c-beds', F.beds || F.baths);
+  set('c-type', document.querySelectorAll('input[name=kind]:not(:checked)').length);
+  set('c-more', ['f-amin', 'f-amax', 'f-smin', 'f-smax', 'f-ymin', 'f-ymax', 'f-hoa'].some(id => val(id) != null) || F.dom ||
+    document.getElementById('f-mine').checked || document.getElementById('f-pricecut').checked);
+  const pl = document.querySelector('#c-price summary');
+  const lo = val('f-pmin'), hi = val('f-pmax');
+  pl.textContent = lo != null || hi != null ? `${lo != null ? short$(lo) : '$0'} – ${hi != null ? short$(hi) : 'Any'}` : 'Price';
+  document.querySelector('#c-beds summary').textContent = F.beds || F.baths ? [F.beds && `${F.beds}+ bd`, F.baths && `${F.baths}+ ba`].filter(Boolean).join(', ') : 'Beds & baths';
+}
+
+// ===== Render: map + list ===================================================
+let current = [], shown = PAGE_SIZE;
+function features(list) {
+  return { type: 'FeatureCollection', features: list.map(l => ({
+    type: 'Feature',
+    properties: { i: l.i, kind: l.mine ? 'mine' : l.kind, color: KIND_COLOR[l.mine ? 'mine' : l.kind],
+      label: short$(l.price) || '?', rank: l.mine ? 0 : (daysOn(l) ?? 999) },
+    geometry: { type: 'Point', coordinates: [l.lng, l.lat] } })) };
+}
+function refresh() {
+  if (!map.getSource('listings')) return;
+  current = filtered();
+  map.getSource('listings').setData(features(current));
+  const ids = new Set(current.map(l => l.listing_id));
+  map.getSource('bounds').setData({ ...boundaries, features: (boundaries.features || []).filter(f => ids.has(String(f.properties.listing_id))) });
+  markActive();
+  shown = PAGE_SIZE;
+  renderList();
+  for (const m of pillMarkers.values()) m.remove();
+  pillMarkers.clear();
+  renderPills();
+}
+function inView() {
+  const b = map.getBounds();
+  return current.filter(l => b.contains([l.lng, l.lat]));
+}
+const SORTS = {
+  new: (a, b) => (daysOn(a) ?? 1e9) - (daysOn(b) ?? 1e9),
+  plo: (a, b) => (a.price ?? 1e12) - (b.price ?? 1e12),
+  phi: (a, b) => (b.price ?? -1) - (a.price ?? -1),
+  ppa: (a, b) => ((a.price && a.acres) ? a.price / a.acres : 1e12) - ((b.price && b.acres) ? b.price / b.acres : 1e12),
+  acres: (a, b) => (b.acres ?? -1) - (a.acres ?? -1),
+  sqft: (a, b) => (b.sqft ?? -1) - (a.sqft ?? -1),
+  beds: (a, b) => (b.beds ?? -1) - (a.beds ?? -1),
+};
+function renderList() {
+  const list = inView().sort(SORTS[document.getElementById('sort').value]);
+  document.getElementById('rcount').textContent = `${list.length.toLocaleString()} result${list.length === 1 ? '' : 's'} on the map`;
+  document.getElementById('toggle').textContent = document.body.classList.contains('show-list') ? 'Map' : `List (${list.length})`;
+  document.getElementById('updated').textContent = updated ? `Listing data from RentCast · updated ${updated}` : '';
+  const el = document.getElementById('cards');
+  el.innerHTML = list.length ? list.slice(0, shown).map(cardHTML).join('')
+    : '<div class="empty">No listings here. Zoom out, move the map, or loosen the filters.</div>';
+  document.getElementById('more').hidden = list.length <= shown;
+}
+function cardHTML(l) {
+  const cut = priceCut(l);
+  const badge = isNew(l) ? `<div class="badge new">${daysOn(l) <= 1 ? 'New today' : `New · ${daysOn(l)} days`}</div>`
+    : cut ? `<div class="badge">Price cut: ${short$(cut)}</div>`
+    : `<div class="badge">${esc(KIND_LABEL[l.kind])}</div>`;
+  const by = [l.rc?.office?.name, l.rc?.mls].filter(Boolean).join(' · ');
+  return `<div class="card" data-i="${l.i}">
+    <div class="thumb"><img loading="lazy" alt="" onerror="this.remove()" src="${esc(aerial(l, 480, 320))}">${badge}${l.mine ? '<div class="badge mine">Mine</div>' : ''}</div>
+    <div class="cbody">
+      <div class="price">${esc(money(l.price))}</div>
+      <div class="facts">${factsLine(l)}</div>
+      <div class="addr">${esc(l.address || l.listing_id)}</div>
+      ${by ? `<div class="by">${esc(by)}</div>` : ''}
+    </div></div>`;
+}
+const cardsEl = document.getElementById('cards');
+cardsEl.addEventListener('click', e => { const c = e.target.closest('.card'); if (c) openDetail(listings[+c.dataset.i], true); });
+cardsEl.addEventListener('mouseover', e => { const c = e.target.closest('.card'); if (c) highlight(listings[+c.dataset.i]); });
+cardsEl.addEventListener('mouseleave', () => highlight(null));
+function highlight(l) {
+  document.querySelectorAll('.pill.hl').forEach(p => p.classList.remove('hl'));
+  if (l) pillMarkers.get(l.i)?.getElement().classList.add('hl');
+  if (!map.getSource('sel')) return;
+  map.getSource('sel').setData(l ? { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [l.lng, l.lat] } } : EMPTY);
+}
+
+// ===== Site info: live lookups for any point ================================
 const CLAYTON = [34.8782, -83.4010];
 const ATL_LL = ATL.split(',').map(Number);
 function miles([lat1, lng1], [lat2, lng2]) {
@@ -332,18 +590,6 @@ function nearbyNames(lng, lat) {
   return { publicLand: names(['public-fill'], p), roads: names(['roads'], box), water: names(['streams', 'water-line'], box) };
 }
 let lookupToken = 0;
-function siteRows(lat, lng) {
-  const near = nearbyNames(lng, lat);
-  return [
-    ['Elevation', '<span id="s-elev">…</span>', true],
-    ['Flood zone', '<span id="s-flood">…</span>', true],
-    ['Public land', near.publicLand || 'No (private / unknown)'],
-    ['Nearby road', near.roads || '— (zoom in)'],
-    ['Nearby water', near.water || '—'],
-    ['To Clayton', `${miles([lat, lng], CLAYTON).toFixed(1)} mi straight line`],
-    ['To Atlanta', `${miles([lat, lng], ATL_LL).toFixed(0)} mi straight line`],
-  ];
-}
 function fillSite(lat, lng) {
   const tok = ++lookupToken;
   const set = (id, p) => p.then(v => v, () => 'lookup failed').then(v => {
@@ -351,92 +597,194 @@ function fillSite(lat, lng) {
   set('s-elev', elevationFt(lat, lng));
   set('s-flood', floodZone(lat, lng));
 }
-const dl = rows => `<dl>${rows.map(([k, v, raw]) => `<dt>${esc(k)}</dt><dd>${raw ? v : esc(v)}</dd>`).join('')}</dl>`;
-const linkRow = links => `<div class="links">${links.filter(Boolean).map(([t, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`).join('')}</div>`;
+const dl = rows => `<dl>${rows.filter(([, v]) => v != null && v !== '').map(([k, v, raw]) => `<dt>${esc(k)}</dt><dd>${raw ? v : esc(v)}</dd>`).join('')}</dl>`;
 const placeLinks = ll => [
-  ['Directions to ATL', `https://www.google.com/maps/dir/?api=1&origin=${ll}&destination=${ATL}&travelmode=driving`],
+  ['Directions to Atlanta', `https://www.google.com/maps/dir/?api=1&origin=${ll}&destination=${ATL}&travelmode=driving`],
   ['Google Maps', `https://www.google.com/maps/search/?api=1&query=${ll}`],
   ['Street View', `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${ll}`],
   ['County parcel (qPublic)', QPUBLIC],
   ['FEMA flood map', `https://msc.fema.gov/portal/search?AddressQuery=${ll}`],
 ];
+const linksHTML = links => `<div class="links">${links.filter(Boolean).map(([t, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`).join('')}</div>`;
 
-function showSpot(lat, lng) {
-  document.getElementById('card').innerHTML = `
-    <h2>Spot info</h2>
-    <div class="sub">${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
-    ${dl(siteRows(lat, lng))}
-    ${linkRow(placeLinks(`${lat},${lng}`))}`;
-  document.getElementById('sheet').classList.add('open');
+// Tap empty map: small popup with spot info
+const popup = new maplibregl.Popup({ maxWidth: '300px' });
+function showSpot(lngLat) {
+  const { lat, lng } = lngLat, near = nearbyNames(lng, lat);
+  popup.setLngLat(lngLat).setHTML(`<h4>This spot</h4>${dl([
+    ['Elevation', '<span id="s-elev">…</span>', true], ['Flood zone', '<span id="s-flood">…</span>', true],
+    ['Public land', near.publicLand || 'No (private / unknown)'], ['Nearby road', near.roads || '— (zoom in)'],
+    ['Nearby water', near.water || '—'], ['To Atlanta', `${miles([lat, lng], ATL_LL).toFixed(0)} mi straight line`]])}
+    ${linksHTML(placeLinks(`${lat},${lng}`).slice(0, 3))}`).addTo(map);
   fillSite(lat, lng);
 }
 
-// Card helpers
-function section(title, rows) {
-  rows = rows.filter(([, v]) => v != null && v !== '');
-  return rows.length ? `<h4 class="sec">${esc(title)}</h4>${dl(rows)}` : '';
+// ===== Detail page ==========================================================
+function payment(price, downPct, ratePct, years) {
+  const p = price * (1 - downPct / 100), r = ratePct / 100 / 12, n = years * 12;
+  return r ? p * r / (1 - (1 + r) ** -n) : p / n;
 }
-const fmtPhone = p => { const d = p.replace(/\D/g, '').replace(/^1(?=\d{10}$)/, ''); return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : p; };
-const telLink = p => `<a href="tel:${esc(p.replace(/[^0-9+]/g, ''))}">${esc(fmtPhone(p))}</a>`;
-const mailLink = m => `<a href="mailto:${esc(m)}">${esc(m)}</a>`;
-function historyTable(h) {
-  if (!h?.length) return '';
-  return `<h4 class="sec">Price history</h4><table class="hist">${h.map(e =>
-    `<tr><td>${esc(e.date)}</td><td>${esc(e.event || '')}</td><td>${esc(money(e.price))}</td></tr>`).join('')}</table>`;
+function payHTML(l) {
+  if (!l.price) return '';
+  return `<div class="box" id="paybox"><h4>Estimated monthly payment</h4>
+    <div class="pay" id="pay-total">—</div>
+    <div class="calc">
+      <div><label>Down %</label><input id="pay-down" type="number" value="20" min="0" max="100"></div>
+      <div><label>Rate %</label><input id="pay-rate" type="number" value="6.5" step="0.125"></div>
+      <div><label>Years</label><input id="pay-years" type="number" value="30"></div>
+    </div>
+    <div class="bar3" id="pay-bar"></div><div class="legend3" id="pay-legend"></div>
+    <div class="note" style="font-size:12px;color:var(--muted);margin-top:6px">Rate is a placeholder; edit it to today's rate. Excludes insurance.</div></div>`;
 }
-function searchLinks(addr) {
-  if (!addr || /EXAMPLE/.test(addr)) return [];
-  const q = encodeURIComponent(addr);
-  return [['Zillow', `https://www.zillow.com/homes/${q}_rb/`], ['Search the web', `https://www.google.com/search?q=${q}`]];
+function updatePay(l) {
+  const box = document.getElementById('paybox'); if (!box) return;
+  const v = id => +document.getElementById(id).value || 0;
+  const pi = payment(l.price, v('pay-down'), v('pay-rate'), v('pay-years') || 30);
+  const taxMo = l.record?.annual_tax ? l.record.annual_tax / 12 : l.price * 0.0075 / 12;
+  const hoa = l.rc?.hoa_fee || 0;
+  const parts = [['Principal & interest', pi, '#006aff'], [`Property tax${l.record?.annual_tax ? '' : ' (est.)'}`, taxMo, '#00a37a'], ['HOA', hoa, '#b86e00']].filter(p => p[1] > 0);
+  const total = parts.reduce((s, p) => s + p[1], 0);
+  document.getElementById('pay-total').textContent = `${money(total)}/mo`;
+  document.getElementById('pay-bar').innerHTML = parts.map(([, v, c]) => `<div style="width:${v / total * 100}%;background:${c}"></div>`).join('');
+  document.getElementById('pay-legend').innerHTML = parts.map(([k, v, c]) => `<div><span><i style="background:${c}"></i>${esc(k)}</span><b>${money(v)}</b></div>`).join('');
 }
 
-function showCard(l) {
-  const rows = [
-    ['Price', money(l.price)],
-    ['Acres', l.acres ?? '—'],
-    ['$ / acre', l.price && l.acres ? money(l.price / l.acres) : '—'],
-  ];
-  if (l.house) rows.push(
-    ['Beds / baths', `${l.beds ?? '—'} / ${l.baths ?? '—'}`],
-    ['Sq ft', l.sqft ? l.sqft.toLocaleString() : '—'],
-    ['$ / sq ft', l.price && l.sqft ? money(l.price / l.sqft) : '—'],
-    ['Year built', l.year_built ?? '—'],
-  );
-  const r = l.rc || {}, rec = l.record || {};
-  if (r.property_type) rows.splice(0, 0, ['Type', r.property_type]);
-  if (r.lot_sqft) rows.push(['Lot', `${r.lot_sqft.toLocaleString()} sq ft (${r.acres} ac)`]);
-  if (r.hoa_fee) rows.push(['HOA', money(r.hoa_fee) + ' / mo']);
-  rows.push(['Drive to ATL', l.drive_min_atl ? `${l.drive_min_atl} min` : '— (tap Directions)'], ['Status', l.status || '—']);
+function openDetail(l, fly) {
+  if (fly) map.easeTo({ center: [l.lng, l.lat], zoom: Math.max(map.getZoom(), 14) });
+  highlight(l);
+  const r = l.rc || {}, rec = l.record || {}, ll = `${l.lat},${l.lng}`;
+  const ppa = l.price && l.acres ? money(l.price / l.acres) + '/acre' : null;
+  const ppsf = l.price && l.sqft ? money(l.price / l.sqft) + '/sqft' : null;
+  const tiles = [
+    ['Type', KIND_LABEL[l.kind]], ['Built', l.year_built ? `Built in ${l.year_built}` : null], ['Lot', acresTxt(l.acres)],
+    ['Price / sqft', ppsf], ['Price / acre', ppa], ['HOA', r.hoa_fee ? `${money(r.hoa_fee)}/mo` : null],
+    ['On market', daysOn(l) != null ? `${daysOn(l)} day${daysOn(l) === 1 ? '' : 's'}` : null],
+    ['Drive to Atlanta', l.drive_min_atl ? `${l.drive_min_atl} min` : `~${Math.round(miles([l.lat, l.lng], ATL_LL))} mi away`],
+  ].filter(t => t[1]);
+  const cut = priceCut(l);
+  const agentPhone = r.agent?.phone || r.office?.phone;
+  const hist = r.history?.length ? `<table class="hist"><tr><th>Date</th><th>Event</th><th>Price</th></tr>${r.history.map(e =>
+    `<tr><td>${esc(e.date)}</td><td>${esc(e.event || '')}</td><td>${esc(money(e.price))}</td></tr>`).join('')}</table>` : '';
+  const feats = Object.entries(rec.features || {});
 
-  const ll = `${l.lat},${l.lng}`;
-
-  document.getElementById('card').innerHTML = `
-    <h2>${esc(l.address || l.listing_id)}</h2>
-    <div class="sub">${esc(l.house ? 'House' : 'Land only')} · ${esc(l.source || '')} · ${esc(l.lat.toFixed(5))}, ${esc(l.lng.toFixed(5))}</div>
-    ${dl(rows)}
-    ${linkRow([safeUrl(l.url) && ['Listing', l.url], ...searchLinks(l.address), ...placeLinks(ll)])}
-    ${l.notes ? `<div class="notes">${esc(l.notes)}</div>` : ''}
-    ${section('On the market', [
-      ['Listed', r.listed_date], ['Days on market', r.days_on_market], ['Listing type', r.listing_type], ['MLS', r.mls]])}
-    ${section('Listing agent', [
-      ['Agent', r.agent?.name], ['Phone', r.agent?.phone && telLink(r.agent.phone), true], ['Email', r.agent?.email && mailLink(r.agent.email), true],
-      ['Office', r.office?.name], ['Office phone', r.office?.phone && telLink(r.office.phone), true]])}
-    ${historyTable(r.history)}
-    ${section('Tax & sale record', [
-      ['Parcel ID', rec.parcel_id], ['Assessed value', rec.assessed_value && `${money(rec.assessed_value)} (${rec.assessed_year})`],
-      ['Property tax', rec.annual_tax && `${money(rec.annual_tax)} / yr (${rec.tax_year})`],
-      ['Last sold', rec.last_sale_date && `${rec.last_sale_date}${rec.last_sale_price ? ' for ' + money(rec.last_sale_price) : ''}`],
-      ['Subdivision', rec.subdivision], ['Zoning', rec.zoning]])}
-    ${section('Features', Object.entries(rec.features || {}))}
-    <h4 class="sec">The site</h4>
-    ${dl(siteRows(l.lat, l.lng))}`;
-  document.getElementById('sheet').classList.add('open');
+  document.getElementById('dpanel').innerHTML = `
+    <div class="dtop"><button id="dback">← Back to search</button>
+      <button id="dshare">Copy link</button></div>
+    <div class="hero">
+      <div style="background-image:url('${esc(aerial(l, 900, 640))}')"><span>Aerial · lot view</span></div>
+      <div style="background-image:url('${esc(aerial(l, 600, 400, 4))}')"><span>Neighborhood</span></div>
+      <div style="background-image:url('${esc(aerial(l, 600, 400, 0.45))}')"><span>Close-up</span></div>
+    </div>
+    <div class="dbody">
+      <div>
+        <div class="dprice">${esc(money(l.price))}</div>
+        <div class="dfacts">${factsLine(l)}</div>
+        <div class="daddr">${esc(l.address || l.listing_id)}</div>
+        <div class="status"><span class="dot"></span> For sale${isNew(l) ? ' · <b>New</b>' : ''}${cut ? ` · <b>Price cut ${esc(money(cut))}</b>` : ''}${l.mine ? ' · <b style="color:var(--blue)">Your listing</b>' : ''}</div>
+        <div class="tiles">${tiles.map(([k, v]) => `<div class="tile"><div>${esc(k)}</div><b>${esc(v)}</b></div>`).join('')}</div>
+      </div>
+      <div class="dside">
+        <div class="box">
+          ${r.agent?.name || r.office?.name ? `<h4>Listed by</h4><div>${esc(r.agent?.name || '')}</div><div style="color:var(--muted)">${esc(r.office?.name || '')}</div>` : '<h4>Listing</h4>'}
+          ${agentPhone ? `<a class="btn primary" href="tel:${esc(String(agentPhone).replace(/[^0-9+]/g, ''))}">Call ${esc(fmtPhone(agentPhone))}</a>` : ''}
+          ${r.agent?.email ? `<a class="btn ghost" href="mailto:${esc(r.agent.email)}?subject=${encodeURIComponent(l.address || '')}">Email agent</a>` : ''}
+          ${safeUrl(l.url) ? `<a class="btn ghost" href="${esc(l.url)}" target="_blank" rel="noopener">View original listing</a>` : ''}
+          ${l.address ? `<a class="btn ghost" href="https://www.zillow.com/homes/${encodeURIComponent(l.address)}_rb/" target="_blank" rel="noopener">See photos on Zillow</a>` : ''}
+        </div>
+        ${payHTML(l)}
+      </div>
+      ${l.notes ? `<div class="dsec"><h3>Your notes</h3><div class="notes">${esc(l.notes)}</div></div>` : ''}
+      <div class="dsec"><h3>Facts &amp; features</h3>${dl([
+        ['Property type', r.property_type || KIND_LABEL[l.kind]], ['Bedrooms', l.beds], ['Bathrooms', l.baths],
+        ['Living area', l.sqft ? `${l.sqft.toLocaleString()} sqft` : null], ['Year built', l.year_built],
+        ['Lot size', r.lot_sqft ? `${r.lot_sqft.toLocaleString()} sqft (${acresTxt(l.acres)})` : acresTxt(l.acres)],
+        ['HOA', r.hoa_fee ? `${money(r.hoa_fee)}/mo` : null], ['Subdivision', rec.subdivision], ['Zoning', rec.zoning],
+        ...feats])}</div>
+      <div class="dsec"><h3>On the market</h3>${dl([
+        ['Listed', r.listed_date], ['Days on market', daysOn(l)], ['Listing type', r.listing_type], ['MLS #', r.mls], ['Status', l.status]])}</div>
+      ${hist ? `<div class="dsec"><h3>Price history</h3>${hist}</div>` : ''}
+      ${rec.assessed_value || rec.annual_tax || rec.last_sale_date ? `<div class="dsec"><h3>Public tax record</h3>${dl([
+        ['Parcel ID', rec.parcel_id],
+        ['Assessed value', rec.assessed_value && `${money(rec.assessed_value)} (${rec.assessed_year})`],
+        ['Property tax', rec.annual_tax && `${money(rec.annual_tax)}/yr (${rec.tax_year})`],
+        ['Last sold', rec.last_sale_date && `${rec.last_sale_date}${rec.last_sale_price ? ' for ' + money(rec.last_sale_price) : ''}`]])}</div>`
+        : l.rc ? `<div class="dsec"><h3>Public tax record</h3><div style="color:var(--muted)">Not fetched yet. It fills in on a later weekly update, or check qPublic below.</div></div>` : ''}
+      <div class="dsec"><h3>The land</h3>${dl([
+        ['Elevation', '<span id="s-elev">…</span>', true], ['Flood zone', '<span id="s-flood">…</span>', true],
+        ['To Clayton', `${miles([l.lat, l.lng], CLAYTON).toFixed(1)} mi straight line`],
+        ['To Atlanta', `${miles([l.lat, l.lng], ATL_LL).toFixed(0)} mi straight line`]])}</div>
+      <div class="dsec"><h3>Links</h3>${linksHTML([...(l.address ? [['Search the web', `https://www.google.com/search?q=${encodeURIComponent(l.address)}`]] : []), ...placeLinks(ll)])}</div>
+      <div style="color:var(--muted);font-size:12px;margin-top:20px">${l.rc ? `Listing data from RentCast${updated ? `, updated ${esc(updated)}` : ''}.` : 'Entered by hand.'} Screening only: confirm boundaries, flood zone and buildability with the county, a survey and a perc test.</div>
+    </div>`;
+  document.getElementById('detail').classList.add('open');
+  document.getElementById('dpanel').scrollTop = 0;
   fillSite(l.lat, l.lng);
+  updatePay(l);
+  document.getElementById('paybox')?.addEventListener('input', () => updatePay(l));
+  document.getElementById('dback').onclick = closeDetail;
+  document.getElementById('dshare').onclick = e => {
+    navigator.clipboard?.writeText(location.href).then(() => e.target.textContent = 'Link copied', () => {});
+  };
+  history.replaceState(null, '', '#' + encodeURIComponent(l.listing_id));
 }
-document.getElementById('close').onclick = () => document.getElementById('sheet').classList.remove('open');
+function closeDetail() {
+  document.getElementById('detail').classList.remove('open');
+  history.replaceState(null, '', location.pathname + location.search);
+  highlight(null);
+}
+document.getElementById('detail').addEventListener('click', e => { if (e.target.id === 'detail') closeDetail(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
 
-// ---- Wire up ---------------------------------------------------------------
-// Start once both the data and the map style are ready, whichever comes last.
+// ===== Controls =============================================================
+const vis = (id, on) => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+const GROUPS = {
+  roads: ['roads', 'road-names'], water: ['water-line', 'streams', 'stream-names', 'lake-names'],
+  places: ['towns', 'peaks', 'pois', 'county'], public: ['public-fill', 'public-line', 'public-names'],
+  bldg: ['bldg'], contours: ['contours'], hill: ['hill'], slope: ['slope'], flood: ['flood'],
+};
+for (const [g, ids] of Object.entries(GROUPS)) document.getElementById('lyr-' + g).onchange = e => ids.forEach(id => vis(id, e.target.checked));
+
+// Segmented buttons (beds, baths, days on market, base map)
+document.querySelectorAll('.seg').forEach(seg => {
+  const key = seg.dataset.f;
+  const paint = () => seg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === F[key]));
+  paint();
+  seg.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    F[key] = b.dataset.v; paint();
+    if (key === 'base') { vis('sat', F.base === 'sat'); vis('topo', F.base === 'topo'); } else refresh();
+  });
+});
+document.querySelectorAll('#chips input:not([id^=lyr-])').forEach(i => i.addEventListener('input', refresh));
+document.getElementById('q').addEventListener('input', refresh);
+document.getElementById('sort').onchange = () => { shown = PAGE_SIZE; renderList(); };
+document.getElementById('more').onclick = () => { shown += PAGE_SIZE; renderList(); };
+document.getElementById('reset').onclick = () => {
+  document.querySelectorAll('#chips input[type=number]').forEach(i => i.value = '');
+  document.querySelectorAll('input[name=kind]').forEach(i => i.checked = true);
+  document.getElementById('f-mine').checked = document.getElementById('f-pricecut').checked = false;
+  Object.assign(F, { beds: '', baths: '', dom: '' });
+  document.querySelectorAll('.seg').forEach(s => s.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === F[s.dataset.f])));
+  document.getElementById('q').value = '';
+  refresh();
+};
+
+// Filter dropdowns: one open at a time, placed under their button
+document.querySelectorAll('.chip').forEach(d => d.addEventListener('toggle', () => {
+  if (!d.open) return;
+  document.querySelectorAll('.chip[open]').forEach(o => o !== d && (o.open = false));
+  const s = d.querySelector('summary').getBoundingClientRect(), pop = d.querySelector('.pop');
+  pop.style.top = (s.bottom + 6) + 'px';
+  pop.style.left = Math.max(8, Math.min(s.left, innerWidth - pop.offsetWidth - 8)) + 'px';
+}));
+document.addEventListener('click', e => {
+  if (!e.target.closest('.chip')) document.querySelectorAll('.chip[open]').forEach(o => o.open = false);
+});
+
+// Mobile list/map toggle
+document.getElementById('toggle').onclick = () => { document.body.classList.toggle('show-list'); renderList(); };
+
+// ===== Start ================================================================
 let started = false;
 const dataReady = load();
 function tryStart() {
@@ -449,25 +797,24 @@ dataReady.then(() => {
 });
 
 function init() {
-  map.on('click', 'pts', e => {
-    const l = listings[e.features[0].properties.i];
-    showCard(l);
-    map.easeTo({ center: [l.lng, l.lat], zoom: Math.max(map.getZoom(), 15) });
-  });
-  map.on('click', 'bounds-fill', e => {
-    const l = listings.find(x => x.listing_id === String(e.features[0].properties.listing_id));
-    if (l) showCard(l);
-  });
-  // Tap anywhere else: spot info
-  map.on('click', e => {
-    const hit = map.queryRenderedFeatures(e.point, { layers: ['pts', 'bounds-fill'] });
-    if (!hit.length) showSpot(e.lngLat.lat, e.lngLat.lng);
-  });
-  for (const id of ['pts', 'bounds-fill']) {
+  const pick = e => listings[e.features[0].properties.i];
+  for (const id of ['dots']) {
+    map.on('click', id, e => { e.originalEvent.handled = true; openDetail(pick(e), false); });
     map.on('mouseenter', id, () => map.getCanvas().style.cursor = 'pointer');
     map.on('mouseleave', id, () => map.getCanvas().style.cursor = '');
   }
+  map.on('click', 'bounds-fill', e => {
+    if (e.originalEvent.handled) return;
+    const l = listings.find(x => x.listing_id === String(e.features[0].properties.listing_id));
+    if (l) { e.originalEvent.handled = true; openDetail(l, false); }
+  });
+  map.on('click', e => { if (!e.originalEvent.handled) showSpot(e.lngLat); });
+  map.on('moveend', () => { shown = PAGE_SIZE; renderList(); renderPills(); });
   refresh();
+  // Open a shared link like ...#rc-12-Bobcat-Ln
+  const id = decodeURIComponent(location.hash.slice(1));
+  const l = id && listings.find(x => x.listing_id === id);
+  if (l) { map.jumpTo({ center: [l.lng, l.lat], zoom: 14 }); openDetail(l, false); }
 }
 </script>
 </body>
