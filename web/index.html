@@ -376,7 +376,8 @@ function section(title, rows) {
   rows = rows.filter(([, v]) => v != null && v !== '');
   return rows.length ? `<h4 class="sec">${esc(title)}</h4>${dl(rows)}` : '';
 }
-const telLink = p => `<a href="tel:${esc(p.replace(/[^0-9+]/g, ''))}">${esc(p)}</a>`;
+const fmtPhone = p => { const d = p.replace(/\D/g, '').replace(/^1(?=\d{10}$)/, ''); return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : p; };
+const telLink = p => `<a href="tel:${esc(p.replace(/[^0-9+]/g, ''))}">${esc(fmtPhone(p))}</a>`;
 const mailLink = m => `<a href="mailto:${esc(m)}">${esc(m)}</a>`;
 function historyTable(h) {
   if (!h?.length) return '';
